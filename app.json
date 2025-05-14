@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "campulse",
+    "name": "CamPulse",
     "slug": "campulse",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,10 +8,13 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true
     },
