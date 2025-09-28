@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,28 +9,68 @@ import {
   Dimensions,
   SafeAreaView,
   FlatList,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { RootStackNavigationProp } from '../types/navigation';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { RootStackNavigationProp, RootStackParamList, Product } from '../types/navigation';
+import { MOCK_PRODUCTS } from '../constants/products';
 
 const { width } = Dimensions.get('window');
 
-const ListingDetailsScreen = ({ route }) => {
+const ListingDetailsScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
-  const { product } = route.params;
+  const route = useRoute<RouteProp<RootStackParamList, 'ListingDetails'>>();
+  const params = route.params;
+
+  const currentProduct: Product | undefined = useMemo(() => {
+    if (params?.product) {
+      return params.product;
+    }
+    if (params?.listingId) {
+      return MOCK_PRODUCTS.find(p => p.id === params.listingId);
+    }
+    return undefined;
+  }, [params]);
+
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const imageCarouselRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
 
-  // Mock data for multiple images
-  const productImages = [
-    { id: '1', url: product.image },
-    { id: '2', url: 'https://picsum.photos/400/501' },
-    { id: '3', url: 'https://picsum.photos/400/502' },
-    { id: '4', url: 'https://picsum.photos/400/503' },
-  ];
+  useEffect(() => {
+    setIsLoading(true);
+    if (currentProduct) {
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+        setError(null);
+      }, 750);
+      return () => clearTimeout(timer);
+    } else {
+      setIsLoading(false);
+    }
+  }, [currentProduct]);
 
-  // Mock comments data
+  const productImages = useMemo(() => {
+    if (!currentProduct) return []; // If no product, return empty array
+    // Restore placeholder images for gallery testing purposes
+    return [
+      { id: '1', url: currentProduct.image },
+      { id: '2', url: `https://picsum.photos/seed/${currentProduct.id}/1/400/501` }, // Unique seed
+      { id: '3', url: `https://picsum.photos/seed/${currentProduct.id}/2/400/502` }, // Unique seed
+      { id: '4', url: `https://picsum.photos/seed/${currentProduct.id}/3/400/503` }, // Unique seed
+    ];
+  }, [currentProduct]);
+
+  const relatedProducts = useMemo(() => {
+    if (!currentProduct) return [];
+    return MOCK_PRODUCTS.filter(
+      p => p.category === currentProduct.category && p.id !== currentProduct.id
+    ).slice(0, 5);
+  }, [currentProduct]);
+
   const comments = [
     {
       id: '1',
@@ -48,22 +88,22 @@ const ListingDetailsScreen = ({ route }) => {
     },
   ];
 
-  const renderImageItem = ({ item, index }) => (
+  const renderImageItem = ({ item }: { item: { id: string; url: string }}) => (
     <Image source={{ uri: item.url }} style={styles.productImage} />
   );
 
-  const renderThumbnail = ({ item, index }) => (
+  const renderRelatedItem = ({ item }: { item: Product }) => (
     <TouchableOpacity
-      style={[
-        styles.thumbnail,
-        activeImageIndex === index && styles.activeThumbnail,
-      ]}
-      onPress={() => {
-        setActiveImageIndex(index);
-        imageCarouselRef.current?.scrollToIndex({ index, animated: true });
-      }}
+      style={styles.relatedItemCard}
+      onPress={() => navigation.push('ListingDetails', { product: item })}
     >
-      <Image source={{ uri: item.url }} style={styles.thumbnailImage} />
+      <Image source={{ uri: item.image }} style={styles.relatedItemImage} />
+      <View style={styles.relatedItemInfo}>
+        <Text style={styles.relatedItemTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.relatedItemPrice}>₦{item.price.toLocaleString()}</Text>
+      </View>
     </TouchableOpacity>
   );
 
@@ -89,9 +129,41 @@ const ListingDetailsScreen = ({ route }) => {
     </View>
   );
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#6366F1" />
+        <Text style={styles.loadingText}>Loading Details...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Ionicons name="alert-circle-outline" size={48} color="red" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={() => { /* Implement retry logic */ }} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+  
+  if (!currentProduct) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <Ionicons name="alert-circle-outline" size={48} color="orange" />
+        <Text style={styles.errorText}>Product not found.</Text>
+         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Custom Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
@@ -99,134 +171,157 @@ const ListingDetailsScreen = ({ route }) => {
         >
           <Ionicons name="arrow-back" size={24} color="#1E293B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Details</Text>
-        <TouchableOpacity style={styles.heartButton}>
-          <Ionicons name="heart-outline" size={24} color="#1E293B" />
+        <Text style={styles.headerTitle} numberOfLines={1}>{currentProduct.title}</Text>
+        <TouchableOpacity 
+          style={styles.heartButton}
+          onPress={() => setIsFavorite(!isFavorite)}
+        >
+          <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? "#FF0000" : "#1E293B"} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView}>
-        {/* Image Carousel */}
-        <View style={styles.imageCarousel}>
-          <FlatList
-            ref={imageCarouselRef}
-            data={productImages}
-            renderItem={renderImageItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(e) => {
-              const index = Math.round(e.nativeEvent.contentOffset.x / width);
-              setActiveImageIndex(index);
-            }}
-            getItemLayout={(data, index) => ({
-              length: width,
-              offset: width * index,
-              index,
-            })}
-          />
-          <View style={styles.imageCounter}>
-            <Text style={styles.imageCounterText}>
-              {activeImageIndex + 1}/{productImages.length}
-            </Text>
-          </View>
-        </View>
-
-        {/* Thumbnails */}
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.thumbnailsContainer}
-        >
-          {productImages.map((item, index) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[
-                styles.thumbnail,
-                activeImageIndex === index && styles.activeThumbnail,
-              ]}
-              onPress={() => {
-                setActiveImageIndex(index);
-                imageCarouselRef.current?.scrollToIndex({ index, animated: true });
-              }}
-            >
-              <Image source={{ uri: item.url }} style={styles.thumbnailImage} />
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Product Info */}
-        <View style={styles.infoContainer}>
-          <Text style={styles.price}>₦{product.price.toLocaleString()}</Text>
-          <Text style={styles.title}>{product.title}</Text>
-          <View style={styles.conditionContainer}>
-            <Text style={styles.conditionLabel}>Condition:</Text>
-            <Text style={styles.condition}>{product.condition}</Text>
-          </View>
-          <Text style={styles.dateListed}>Listed 3 days ago</Text>
-        </View>
-
-        {/* Seller Info */}
-        <View style={styles.sellerContainer}>
-          <View style={styles.sellerHeader}>
-            <View style={styles.sellerAvatar}>
-              <Ionicons name="person" size={24} color="#6366F1" />
+      <FlatList
+        data={[1]} // Single item to render the sections
+        renderItem={() => (
+          <>
+            <View style={styles.imageCarousel}>
+              <FlatList
+                ref={imageCarouselRef}
+                data={productImages}
+                renderItem={renderImageItem}
+                keyExtractor={(item) => item.id}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                scrollEnabled={productImages.length > 1}
+                onMomentumScrollEnd={(e) => {
+                  if (productImages.length > 1) {
+                    const index = Math.round(e.nativeEvent.contentOffset.x / width);
+                    setActiveImageIndex(index);
+                  }
+                }}
+                getItemLayout={(data, index) => ({
+                  length: width,
+                  offset: width * index,
+                  index,
+                })}
+              />
+              {productImages.length > 1 && (
+                <View style={styles.imageCounter}>
+                  <Text style={styles.imageCounterText}>
+                    {activeImageIndex + 1}/{productImages.length}
+                  </Text>
+                </View>
+              )}
             </View>
-            <View style={styles.sellerInfo}>
-              <Text style={styles.sellerName}>John Doe</Text>
-              <View style={styles.sellerMeta}>
-                <Text style={styles.sellerRating}>⭐ 4.8 (120 reviews)</Text>
-                {product.sellerVerified && (
-                  <View style={styles.verifiedBadge}>
-                    <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                    <Text style={styles.verifiedText}>Verified</Text>
+
+            {productImages.length > 1 && (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.thumbnailsContainer}
+                contentContainerStyle={styles.thumbnailsContentContainer}
+              >
+                {productImages.map((item, index) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.thumbnail,
+                      activeImageIndex === index && styles.activeThumbnail,
+                    ]}
+                    onPress={() => {
+                      setActiveImageIndex(index);
+                      imageCarouselRef.current?.scrollToIndex({ index, animated: true });
+                    }}
+                  >
+                    <Image source={{ uri: item.url }} style={styles.thumbnailImage} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={styles.infoContainer}>
+              <Text style={styles.price}>₦{currentProduct.price.toLocaleString()}</Text>
+              <Text style={styles.title}>{currentProduct.title}</Text>
+              <View style={styles.conditionContainer}>
+                <Text style={styles.conditionLabel}>Condition:</Text>
+                <Text style={styles.condition}>{currentProduct.condition}</Text>
+              </View>
+              <Text style={styles.dateListed}>Listed {currentProduct.datePosted}</Text>
+            </View>
+
+            <View style={styles.sellerContainer}>
+              <View style={styles.sellerHeader}>
+                <View style={styles.sellerAvatar}>
+                  <Ionicons name="person" size={24} color="#6366F1" />
+                </View>
+                <View style={styles.sellerInfo}>
+                  <Text style={styles.sellerName}>John Doe</Text> 
+                  <View style={styles.sellerMeta}>
+                    <Text style={styles.sellerRating}>⭐ 4.8 (120 reviews)</Text>
+                    {currentProduct.sellerVerified && (
+                      <View style={styles.verifiedBadge}>
+                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                        <Text style={styles.verifiedText}>Verified</Text>
+                      </View>
+                    )}
                   </View>
-                )}
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.viewProfileButton}
+                onPress={() => navigation.navigate('Profile', { userId: '123' })} 
+              >
+                <Text style={styles.viewProfileText}>View Profile</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.descriptionContainer}>
+              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.description}>
+                {currentProduct.description}
+              </Text>
+            </View>
+
+            <View style={styles.locationContainer}>
+              <Text style={styles.sectionTitle}>Location</Text>
+              <View style={styles.locationInfo}>
+                <Ionicons name="location-outline" size={20} color="#6366F1" />
+                <Text style={styles.locationText}>Near Engineering Building, University Campus</Text>
               </View>
             </View>
-          </View>
-          <TouchableOpacity 
-            style={styles.viewProfileButton}
-            onPress={() => navigation.navigate('Profile', { userId: '123' })}
-          >
-            <Text style={styles.viewProfileText}>View Profile</Text>
-          </TouchableOpacity>
-        </View>
 
-        {/* Description */}
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.sectionTitle}>Description</Text>
-          <Text style={styles.description}>
-            This is a detailed description of the product. It includes information about the condition,
-            usage, and any other relevant details that potential buyers might want to know.
-          </Text>
-        </View>
+            {comments.length > 0 && (
+              <View style={styles.commentsSection}>
+                <Text style={styles.sectionTitle}>Comments ({comments.length})</Text>
+                <FlatList
+                  data={comments}
+                  renderItem={renderComment}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                />
+              </View>
+            )}
+            
+            {relatedProducts.length > 0 && (
+              <View style={styles.relatedItemsSection}>
+                <Text style={styles.sectionTitle}>Related Items</Text>
+                <FlatList
+                  data={relatedProducts}
+                  renderItem={renderRelatedItem}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.relatedItemsList}
+                />
+              </View>
+            )}
+          </>
+        )}
+        keyExtractor={() => 'listing-details-content'}
+        showsVerticalScrollIndicator={false}
+      />
 
-        {/* Location */}
-        <View style={styles.locationContainer}>
-          <Text style={styles.sectionTitle}>Location</Text>
-          <View style={styles.locationInfo}>
-            <Ionicons name="location-outline" size={20} color="#6366F1" />
-            <Text style={styles.locationText}>Near Engineering Building, University Campus</Text>
-          </View>
-        </View>
-
-        {/* Comments */}
-        <View style={styles.commentsContainer}>
-          <View style={styles.commentsHeader}>
-            <Text style={styles.sectionTitle}>Comments</Text>
-          </View>
-          <FlatList
-            data={comments}
-            renderItem={renderComment}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
-        </View>
-      </ScrollView>
-
-      {/* Action Buttons */}
       <View style={styles.actionContainer}>
         <TouchableOpacity 
           style={styles.messageButton}
@@ -235,7 +330,10 @@ const ListingDetailsScreen = ({ route }) => {
           <Ionicons name="chatbubble-outline" size={20} color="#6366F1" />
           <Text style={styles.messageButtonText}>Message</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.buyButton}>
+        <TouchableOpacity 
+          style={styles.buyButton}
+          onPress={() => console.log('Buy Now pressed for product:', currentProduct.id)}
+        >
           <Text style={styles.buyButtonText}>Buy Now</Text>
         </TouchableOpacity>
       </View>
@@ -246,43 +344,105 @@ const ListingDetailsScreen = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    flex: 1,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#4B5563',
+  },
+  errorText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingTop: 40,
+  },
+  backButton: {
+    padding: 4,
+    marginRight: 8,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginHorizontal: 8,
+  },
+  heartButton: {
+    padding: 4,
+    marginLeft: 8,
   },
   scrollView: {
     flex: 1,
   },
   imageCarousel: {
     position: 'relative',
+    backgroundColor: '#e0e0e0',
   },
   productImage: {
     width: width,
     height: 300,
+    resizeMode: 'cover',
   },
   imageCounter: {
     position: 'absolute',
     bottom: 16,
     right: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   imageCounterText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   thumbnailsContainer: {
-    padding: 16,
-    gap: 8,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+  },
+  thumbnailsContentContainer: {
+    paddingHorizontal: 16,
   },
   thumbnail: {
-    width: 60,
-    height: 60,
+    width: 64,
+    height: 64,
     borderRadius: 8,
-    marginRight: 8,
+    marginRight: 10,
     borderWidth: 2,
     borderColor: 'transparent',
+    overflow: 'hidden',
   },
   activeThumbnail: {
     borderColor: '#6366F1',
@@ -290,25 +450,27 @@ const styles = StyleSheet.create({
   thumbnailImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 6,
+    resizeMode: 'cover',
   },
   infoContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
   price: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#6366F1',
     marginBottom: 8,
   },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 12,
-    lineHeight: 28,
+    lineHeight: 30,
   },
   conditionContainer: {
     flexDirection: 'row',
@@ -317,32 +479,40 @@ const styles = StyleSheet.create({
   },
   conditionLabel: {
     fontSize: 15,
-    color: '#64748B',
+    color: '#475569',
     marginRight: 8,
   },
   condition: {
     fontSize: 15,
     color: '#1E293B',
     fontWeight: '500',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    overflow: 'hidden',
   },
   dateListed: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748B',
+    marginTop: 4,
   },
   sellerContainer: {
     padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    marginTop: 8,
   },
   sellerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sellerAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -352,7 +522,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sellerName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: '#1E293B',
     marginBottom: 4,
@@ -360,42 +530,46 @@ const styles = StyleSheet.create({
   sellerMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   sellerRating: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#475569',
   },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    gap: 2,
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   verifiedText: {
+    marginLeft: 4,
     fontSize: 12,
-    color: '#10B981',
+    color: '#0EA5E9',
     fontWeight: '500',
   },
   viewProfileButton: {
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderWidth: 1.5,
+    borderColor: '#6366F1',
     alignItems: 'center',
+    backgroundColor: '#fff',
   },
   viewProfileText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#6366F1',
   },
   descriptionContainer: {
     padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    marginTop: 8,
   },
   sectionTitle: {
     fontSize: 18,
@@ -406,12 +580,14 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 15,
     color: '#475569',
-    lineHeight: 22,
+    lineHeight: 24,
   },
   locationContainer: {
     padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    marginTop: 8,
   },
   locationInfo: {
     flexDirection: 'row',
@@ -423,19 +599,18 @@ const styles = StyleSheet.create({
     color: '#475569',
     flex: 1,
   },
-  commentsContainer: {
+  commentsSection: {
     padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    marginTop: 24,
-  },
-  commentsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 16,
+    marginTop: 8,
   },
   commentContainer: {
     marginBottom: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   commentHeader: {
     flexDirection: 'row',
@@ -445,12 +620,12 @@ const styles = StyleSheet.create({
   commentUserInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   commentUserAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -464,28 +639,72 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginTop: 2,
   },
   commentRating: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: 13,
+    color: '#475569',
   },
   commentDate: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748B',
   },
   commentContent: {
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 8,
+    paddingLeft: 46,
   },
   commentText: {
-    fontSize: 15,
-    color: '#475569',
-    lineHeight: 22,
+    fontSize: 14,
+    color: '#334155',
+    lineHeight: 20,
+  },
+  relatedItemsSection: {
+    paddingTop: 16,
+    paddingBottom: 24,
+    backgroundColor: '#fff',
+    marginTop: 8,
+    paddingHorizontal: 16,
+  },
+  relatedItemsList: {
+    paddingVertical: 8,
+  },
+  relatedItemCard: {
+    width: 160,
+    marginRight: 12,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  relatedItemImage: {
+    width: '100%',
+    height: 100,
+    borderTopLeftRadius: 9,
+    borderTopRightRadius: 9,
+  },
+  relatedItemInfo: {
+    padding: 10,
+  },
+  relatedItemTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 4,
+  },
+  relatedItemPrice: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#6366F1',
   },
   actionContainer: {
     flexDirection: 'row',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
     gap: 12,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
@@ -496,9 +715,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
     borderColor: '#6366F1',
     gap: 8,
   },
@@ -508,37 +727,17 @@ const styles = StyleSheet.create({
     color: '#6366F1',
   },
   buyButton: {
-    flex: 2,
-    padding: 12,
-    borderRadius: 12,
+    flex: 1.5,
+    paddingVertical: 12,
+    borderRadius: 10,
     backgroundColor: '#6366F1',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   buyButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    backgroundColor: '#fff',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  backButton: {
-    padding: 4,
-  },
-  heartButton: {
-    padding: 4,
   },
 });
 

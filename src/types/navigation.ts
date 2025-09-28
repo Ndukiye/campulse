@@ -9,17 +9,25 @@ export type Product = {
   category: string;
   condition: string;
   sellerVerified: boolean;
+  description: string;
+  datePosted: string;
 };
 
 export type RootStackParamList = {
   Auth: undefined;
-  Main: undefined;
+  Main: {
+    screen?: keyof MainTabParamList;
+    params?: any;
+  };
   ListingDetails: { listingId?: string; product?: Product };
   CreateListing: undefined;
   Profile: { userId?: string };
   Chat: { userId: string };
   Settings: undefined;
   Messages: undefined;
+  Notifications: undefined;
+  PrivacySecurity: undefined;
+  HelpSupport: undefined;
 };
 
 export type MainTabParamList = {

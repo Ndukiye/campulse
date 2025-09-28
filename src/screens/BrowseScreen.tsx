@@ -11,10 +11,13 @@ import {
   SafeAreaView,
   Modal,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MainTabNavigationProp, RootStackNavigationProp, Product, MainTabParamList } from '../types/navigation';
 import { useRoute, RouteProp } from '@react-navigation/native';
+import { APP_CATEGORIES } from '../constants/categories';
+import { MOCK_PRODUCTS } from '../constants/products';
 
 type BrowseScreenProps = {
   navigation: MainTabNavigationProp & RootStackNavigationProp;
@@ -29,47 +32,8 @@ type FilterOptions = {
   condition: 'all' | 'new' | 'like-new' | 'good' | 'fair';
 };
 
-// Mock data for products
-const mockProducts: Product[] = [
-  {
-    id: '1',
-    title: 'Textbook: Introduction to Computer Science',
-    price: 45000,
-    image: 'https://picsum.photos/400/500',
-    category: 'Books',
-    condition: 'Like New',
-    sellerVerified: true,
-  },
-  {
-    id: '2',
-    title: 'Scientific Calculator',
-    price: 15000,
-    image: 'https://picsum.photos/400/501',
-    category: 'Electronics',
-    condition: 'Good',
-    sellerVerified: false,
-  },
-  {
-    id: '3',
-    title: 'Dorm Room Chair',
-    price: 25000,
-    image: 'https://picsum.photos/400/502',
-    category: 'Furniture',
-    condition: 'Like New',
-    sellerVerified: true,
-  },
-  {
-    id: '4',
-    title: 'Chemistry Lab Kit',
-    price: 35000,
-    image: 'https://picsum.photos/400/503',
-    category: 'Other',
-    condition: 'Good',
-    sellerVerified: false,
-  },
-];
-
-const categories = ['All', 'Books', 'Electronics', 'Furniture', 'Clothing', 'Other'];
+// Generate categories for the filter list dynamically
+const browseScreenCategories = ['All', ...APP_CATEGORIES.map(cat => cat.name)];
 
 const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
   const route = useRoute<RouteProp<MainTabParamList, 'Browse'>>();
@@ -94,7 +58,7 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
 
   // Filter products based on search, category, and filters
   const filteredProducts = useMemo(() => {
-    return mockProducts.filter(product => {
+    return MOCK_PRODUCTS.filter(product => {
       // Search filter
       const matchesSearch = searchQuery === '' || 
         product.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -125,7 +89,11 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
       style={styles.productCard}
       onPress={() => navigation.navigate('ListingDetails', { product: item })}
     >
-      <Image source={{ uri: item.image }} style={styles.productImage} />
+      <Image 
+        source={{ uri: item.image }} 
+        style={styles.productImage}
+        resizeMode="cover"
+      />
       <View style={styles.productInfo}>
         <Text style={styles.productTitle} numberOfLines={2}>
           {item.title}
@@ -153,117 +121,119 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Filters</Text>
-            <TouchableOpacity onPress={() => setShowFilters(false)}>
-              <Ionicons name="close" size={24} color="#1E293B" />
-            </TouchableOpacity>
-          </View>
+          <View style={styles.filterSection}>
+            <View style={styles.filterHeader}>
+              <Text style={styles.filterTitle}>Filters</Text>
+              <TouchableOpacity onPress={() => setShowFilters(false)}>
+                <Ionicons name="close" size={24} color="#1E293B" />
+              </TouchableOpacity>
+            </View>
 
-          <ScrollView style={styles.filterContent}>
-            {/* Price Range */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Price Range</Text>
-              <View style={styles.priceInputs}>
-                <View style={styles.priceInput}>
-                  <Text style={styles.priceLabel}>Min</Text>
-                  <TextInput
-                    style={styles.priceTextInput}
-                    placeholder="₦0"
-                    keyboardType="numeric"
-                    value={filters.priceRange.min.toString()}
-                    onChangeText={(text) => setFilters({
-                      ...filters,
-                      priceRange: { ...filters.priceRange, min: Number(text) || 0 }
-                    })}
-                  />
+            <ScrollView style={styles.filterContent}>
+              {/* Price Range */}
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupTitle}>Price Range</Text>
+                <View style={styles.priceInputs}>
+                  <View style={styles.priceInput}>
+                    <Text style={styles.priceLabel}>Min</Text>
+                    <TextInput
+                      style={styles.priceField}
+                      placeholder="₦0"
+                      keyboardType="numeric"
+                      value={filters.priceRange.min.toString()}
+                      onChangeText={(text) => setFilters({
+                        ...filters,
+                        priceRange: { ...filters.priceRange, min: Number(text) || 0 }
+                      })}
+                    />
+                  </View>
+                  <View style={styles.priceInput}>
+                    <Text style={styles.priceLabel}>Max</Text>
+                    <TextInput
+                      style={styles.priceField}
+                      placeholder="₦1,000,000"
+                      keyboardType="numeric"
+                      value={filters.priceRange.max.toString()}
+                      onChangeText={(text) => setFilters({
+                        ...filters,
+                        priceRange: { ...filters.priceRange, max: Number(text) || 0 }
+                      })}
+                    />
+                  </View>
                 </View>
-                <View style={styles.priceInput}>
-                  <Text style={styles.priceLabel}>Max</Text>
-                  <TextInput
-                    style={styles.priceTextInput}
-                    placeholder="₦1,000,000"
-                    keyboardType="numeric"
-                    value={filters.priceRange.max.toString()}
-                    onChangeText={(text) => setFilters({
-                      ...filters,
-                      priceRange: { ...filters.priceRange, max: Number(text) || 0 }
-                    })}
-                  />
+              </View>
+
+              {/* Seller Type */}
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupTitle}>Seller Type</Text>
+                <View style={styles.filterOptions}>
+                  {['all', 'verified', 'unverified'].map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.filterOption,
+                        filters.sellerType === type && styles.filterOptionActive,
+                      ]}
+                      onPress={() => setFilters({ ...filters, sellerType: type as FilterOptions['sellerType'] })}
+                    >
+                      <Text
+                        style={[
+                          styles.filterOptionText,
+                          filters.sellerType === type && styles.filterOptionTextActive,
+                        ]}
+                      >
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
-            </View>
 
-            {/* Seller Type */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Seller Type</Text>
-              <View style={styles.filterOptions}>
-                {['all', 'verified', 'unverified'].map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.filterOption,
-                      filters.sellerType === type && styles.filterOptionActive,
-                    ]}
-                    onPress={() => setFilters({ ...filters, sellerType: type as FilterOptions['sellerType'] })}
-                  >
-                    <Text
+              {/* Condition */}
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupTitle}>Condition</Text>
+                <View style={styles.filterOptions}>
+                  {['all', 'new', 'like-new', 'good', 'fair'].map((condition) => (
+                    <TouchableOpacity
+                      key={condition}
                       style={[
-                        styles.filterOptionText,
-                        filters.sellerType === type && styles.filterOptionTextActive,
+                        styles.filterOption,
+                        filters.condition === condition && styles.filterOptionActive,
                       ]}
+                      onPress={() => setFilters({ ...filters, condition: condition as FilterOptions['condition'] })}
                     >
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text
+                        style={[
+                          styles.filterOptionText,
+                          filters.condition === condition && styles.filterOptionTextActive,
+                        ]}
+                      >
+                        {condition.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
+            </ScrollView>
 
-            {/* Condition */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Condition</Text>
-              <View style={styles.filterOptions}>
-                {['all', 'new', 'like-new', 'good', 'fair'].map((condition) => (
-                  <TouchableOpacity
-                    key={condition}
-                    style={[
-                      styles.filterOption,
-                      filters.condition === condition && styles.filterOptionActive,
-                    ]}
-                    onPress={() => setFilters({ ...filters, condition: condition as FilterOptions['condition'] })}
-                  >
-                    <Text
-                      style={[
-                        styles.filterOptionText,
-                        filters.condition === condition && styles.filterOptionTextActive,
-                      ]}
-                    >
-                      {condition.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <View style={styles.filterActions}>
+              <TouchableOpacity
+                style={styles.resetButton}
+                onPress={() => setFilters({
+                  priceRange: { min: 0, max: 1000000 },
+                  sellerType: 'all',
+                  condition: 'all',
+                })}
+              >
+                <Text style={styles.resetButtonText}>Reset</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.applyButton}
+                onPress={() => setShowFilters(false)}
+              >
+                <Text style={styles.applyButtonText}>Apply Filters</Text>
+              </TouchableOpacity>
             </View>
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.resetButton}
-              onPress={() => setFilters({
-                priceRange: { min: 0, max: 1000000 },
-                sellerType: 'all',
-                condition: 'all',
-              })}
-            >
-              <Text style={styles.resetButtonText}>Reset</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.applyButton}
-              onPress={() => setShowFilters(false)}
-            >
-              <Text style={styles.applyButtonText}>Apply Filters</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -272,52 +242,50 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Browse</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 
-            style={styles.headerIcon}
-            onPress={() => navigation.navigate('Messages')}
+            style={styles.headerButton}
+            onPress={() => navigation.navigate('Notifications')}
           >
-            <Ionicons name="chatbubble-outline" size={24} color="#1E293B" />
+            <Ionicons name="notifications-outline" size={24} color="#1E293B" />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerIcon}
-            onPress={() => navigation.navigate('Profile')}
+            onPress={() => navigation.navigate('Messages')}
           >
-            <Ionicons name="person-circle-outline" size={24} color="#1E293B" />
+            <Ionicons name="chatbubble-outline" size={22} color="#1E293B" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Search Bar with Filter */}
-      <View style={styles.searchWrapper}>
+      {/* Search and Filters */}
+      <View style={styles.searchFilterContainer}>
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#6366F1" style={styles.searchIcon} />
+          <Ionicons name="search" size={18} color="#6366F1" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search products..."
+            placeholder="Search listings..."
+            placeholderTextColor="#94A3B8"
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#94A3B8"
+            returnKeyType="search"
           />
         </View>
-        <TouchableOpacity 
-          style={styles.filterButton}
-          onPress={() => setShowFilters(true)}
-        >
-          <Ionicons name="options-outline" size={24} color="#6366F1" />
+        <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
+          <Ionicons name="options-outline" size={20} color="#6366F1" />
+          <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Category Filters */}
+      {/* Category Selector */}
       <View style={styles.categoriesWrapper}>
         <FlatList
           horizontal
-          data={categories}
+          data={browseScreenCategories}
           keyExtractor={(item) => item}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -348,7 +316,7 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
         renderItem={renderProductItem}
         keyExtractor={(item) => item.id}
         numColumns={2}
-        contentContainerStyle={styles.productsGrid}
+        contentContainerStyle={styles.productList}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="search-outline" size={48} color="#94A3B8" />
@@ -373,57 +341,73 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    backgroundColor: '#fff',
+    paddingTop: 40,
   },
   headerLeft: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#6366F1',
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  headerButton: {
+    padding: 8,
+  },
   headerIcon: {
     marginLeft: 16,
     padding: 4,
   },
-  searchWrapper: {
+  searchFilterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginTop: 16,
-    gap: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   searchContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 12,
-    shadowColor: '#6366F1',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 40,
+    marginRight: 8,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    height: 40,
+    fontSize: 15,
     color: '#1E293B',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    height: 40,
+  },
+  filterButtonText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#6366F1',
+    fontWeight: '500',
   },
   categoriesWrapper: {
     backgroundColor: '#fff',
@@ -455,76 +439,76 @@ const styles = StyleSheet.create({
     borderColor: '#6366F1',
   },
   categoryButtonText: {
-    color: '#64748B',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#4B5563',
+    fontWeight: '500',
   },
   categoryButtonTextActive: {
+    fontSize: 13,
     color: '#fff',
+    fontWeight: '600',
   },
-  productsGrid: {
-    padding: 8,
+  productList: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
   },
   productCard: {
-    flex: 1,
-    margin: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    shadowColor: '#6366F1',
+    marginBottom: 16,
+    marginHorizontal: 4,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 3.84,
+    elevation: 5,
+    overflow: 'hidden',
+    width: '47%',
   },
   productImage: {
     width: '100%',
-    height: 200,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    height: 240,
+    backgroundColor: '#F1F5F9',
   },
   productInfo: {
     padding: 12,
   },
   productTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1E293B',
-    marginBottom: 8,
-    lineHeight: 20,
+    marginBottom: 4,
   },
   productPrice: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#6366F1',
-    marginBottom: 4,
+    color: '#4338CA',
+    marginBottom: 8,
   },
   productMeta: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    alignItems: 'center',
   },
   productCondition: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
-    fontWeight: '500',
   },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#D1FAE5',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-    gap: 2,
   },
   verifiedText: {
     fontSize: 12,
-    color: '#10B981',
-    fontWeight: '500',
+    color: '#059669',
+    marginLeft: 2,
   },
   modalOverlay: {
     flex: 1,
@@ -537,30 +521,42 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     maxHeight: '80%',
   },
-  modalHeader: {
+  filterSection: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    height: '80%',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  filterHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    marginBottom: 12,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  filterTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#1E293B',
   },
   filterContent: {
-    padding: 16,
+    flex: 1,
+    marginBottom: 12,
   },
-  filterSection: {
-    marginBottom: 24,
+  filterGroup: {
+    marginBottom: 16,
   },
-  filterSectionTitle: {
+  filterGroupTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 12,
+    color: '#334155',
+    marginBottom: 8,
   },
   priceInputs: {
     flexDirection: 'row',
@@ -568,19 +564,21 @@ const styles = StyleSheet.create({
   },
   priceInput: {
     flex: 1,
+    marginRight: 8,
   },
   priceLabel: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: 13,
+    color: '#4B5563',
     marginBottom: 4,
   },
-  priceTextInput: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+  priceField: {
+    backgroundColor: '#F8FAFC',
     borderRadius: 8,
-    padding: 8,
-    fontSize: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
     color: '#1E293B',
+    height: 40,
   },
   filterOptions: {
     flexDirection: 'row',
@@ -588,10 +586,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterOption: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -600,19 +597,21 @@ const styles = StyleSheet.create({
     borderColor: '#6366F1',
   },
   filterOptionText: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: 13,
     fontWeight: '500',
   },
   filterOptionTextActive: {
-    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  modalFooter: {
+  filterActions: {
     flexDirection: 'row',
-    padding: 16,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
-    gap: 12,
+    marginTop: 'auto',
   },
   resetButton: {
     flex: 1,
@@ -621,6 +620,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
+    marginRight: 8,
   },
   resetButtonText: {
     color: '#64748B',
@@ -628,32 +628,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   applyButton: {
-    flex: 2,
-    padding: 12,
-    borderRadius: 12,
+    flex: 1,
     backgroundColor: '#6366F1',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
     alignItems: 'center',
   },
   applyButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-  },
-  filterButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#6366F1',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
   emptyState: {
     flex: 1,

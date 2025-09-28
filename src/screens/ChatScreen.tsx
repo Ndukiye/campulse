@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,44 +10,53 @@ import {
   Platform,
   SafeAreaView,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
-
-// Mock data for messages
-const mockMessages = [
-  {
-    id: '1',
-    text: 'Hi, is this still available?',
-    sender: 'user',
-    timestamp: '10:30 AM',
-  },
-  {
-    id: '2',
-    text: 'Yes, it is! Are you interested in buying?',
-    sender: 'seller',
-    timestamp: '10:32 AM',
-  },
-  {
-    id: '3',
-    text: 'Yes, I am. Can we meet on campus?',
-    sender: 'user',
-    timestamp: '10:33 AM',
-  },
-  {
-    id: '4',
-    text: 'Sure, I\'m usually around the Engineering Building. When would you like to meet?',
-    sender: 'seller',
-    timestamp: '10:35 AM',
-  },
-];
+import { pickImage, pickDocument, Attachment, formatFileSize, getFileIcon } from '../utils/chatUtils';
+import {
+  sendMessage,
+  subscribeToMessages,
+  markMessagesAsRead,
+  subscribeToTypingStatus,
+  updateTypingStatus,
+  Message,
+} from '../services/chatService';
 
 const ChatScreen = ({ route }) => {
+  const { conversationId, otherUserId } = route.params;
   const navigation = useNavigation<RootStackNavigationProp>();
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState(mockMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const flatListRef = useRef(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    // Subscribe to messages
+    const unsubscribeMessages = subscribeToMessages(conversationId, (newMessages) => {
+      setMessages(newMessages);
+      markMessagesAsRead(conversationId, 'currentUserId'); // Replace with actual user ID
+    });
+
+    // Subscribe to typing status
+    const unsubscribeTyping = subscribeToTypingStatus(
+      conversationId,
+      otherUserId,
+      (isTyping) => setIsOtherTyping(isTyping)
+    );
+
+    return () => {
+      unsubscribeMessages();
+      unsubscribeTyping();
+    };
+  }, [conversationId, otherUserId]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -60,7 +69,7 @@ const ChatScreen = ({ route }) => {
       [
         {
           text: 'View Profile',
-          onPress: () => navigation.navigate('Profile', { userId: '123' }),
+          onPress: () => navigation.navigate('Profile', { userId: otherUserId }),
         },
         {
           text: 'Block User',
@@ -84,18 +93,24 @@ const ChatScreen = ({ route }) => {
     );
   };
 
-  const handleAttachment = () => {
+  const handleAttachment = async () => {
     Alert.alert(
       'Add Attachment',
       'Choose attachment type',
       [
         {
           text: 'Image',
-          onPress: () => console.log('Image attachment'),
+          onPress: async () => {
+            const result = await pickImage();
+            if (result) setAttachment(result);
+          },
         },
         {
           text: 'Document',
-          onPress: () => console.log('Document attachment'),
+          onPress: async () => {
+            const result = await pickDocument();
+            if (result) setAttachment(result);
+          },
         },
         {
           text: 'Cancel',
@@ -105,34 +120,114 @@ const ChatScreen = ({ route }) => {
     );
   };
 
-  const sendMessage = () => {
-    if (message.trim()) {
-      const newMessage = {
-        id: Date.now().toString(),
-        text: message.trim(),
-        sender: 'user',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages([...messages, newMessage]);
+  const handleTyping = (text: string) => {
+    setMessage(text);
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set typing status to true
+    if (!isTyping) {
+      setIsTyping(true);
+      updateTypingStatus(conversationId, 'currentUserId', true); // Replace with actual user ID
+    }
+
+    // Set a timeout to set typing status to false
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      updateTypingStatus(conversationId, 'currentUserId', false); // Replace with actual user ID
+    }, 2000);
+  };
+
+  const sendMessage = async () => {
+    if (!message.trim() && !attachment) return;
+
+    setIsLoading(true);
+    try {
+      await sendMessage(conversationId, 'currentUserId', message.trim(), attachment);
       setMessage('');
-      // Scroll to bottom after sending message
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      setAttachment(null);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to send message. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const renderMessage = ({ item }) => (
+  const renderAttachment = () => {
+    if (!attachment) return null;
+
+    return (
+      <View style={styles.attachmentPreview}>
+        {attachment.type === 'image' ? (
+          <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} />
+        ) : (
+          <View style={styles.documentPreview}>
+            <Ionicons name={getFileIcon(attachment.mimeType)} size={24} color="#6366F1" />
+            <Text style={styles.documentName} numberOfLines={1}>
+              {attachment.name}
+            </Text>
+            {attachment.size && (
+              <Text style={styles.documentSize}>
+                {formatFileSize(attachment.size)}
+              </Text>
+            )}
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.removeAttachment}
+          onPress={() => setAttachment(null)}
+        >
+          <Ionicons name="close-circle" size={20} color="#94A3B8" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderMessage = ({ item }: { item: Message }) => (
     <View style={[
       styles.messageContainer,
-      item.sender === 'user' ? styles.userMessage : styles.sellerMessage
+      item.senderId === 'currentUserId' ? styles.userMessage : styles.sellerMessage
     ]}>
       <View style={[
         styles.messageBubble,
-        item.sender === 'user' ? styles.userBubble : styles.sellerBubble
+        item.senderId === 'currentUserId' ? styles.userBubble : styles.sellerBubble
       ]}>
-        <Text style={styles.messageText}>{item.text}</Text>
-        <Text style={styles.timestamp}>{item.timestamp}</Text>
+        {item.attachment && (
+          <View style={styles.attachmentContainer}>
+            {item.attachment.type === 'image' ? (
+              <Image source={{ uri: item.attachment.url }} style={styles.messageImage} />
+            ) : (
+              <TouchableOpacity style={styles.messageDocument}>
+                <Ionicons name={getFileIcon(item.attachment.mimeType)} size={24} color="#6366F1" />
+                <Text style={styles.documentName} numberOfLines={1}>
+                  {item.attachment.name}
+                </Text>
+                {item.attachment.size && (
+                  <Text style={styles.documentSize}>
+                    {formatFileSize(item.attachment.size)}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {item.text && <Text style={styles.messageText}>{item.text}</Text>}
+        <View style={styles.messageFooter}>
+          <Text style={styles.timestamp}>
+            {item.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+          {item.senderId === 'currentUserId' && (
+            <Ionicons
+              name={item.read ? "checkmark-done" : "checkmark"}
+              size={16}
+              color={item.read ? "#6366F1" : "#94A3B8"}
+              style={styles.readReceipt}
+            />
+          )}
+        </View>
       </View>
     </View>
   );
@@ -145,24 +240,26 @@ const ChatScreen = ({ route }) => {
           style={styles.backButton}
           onPress={handleBack}
         >
-          <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          <Ionicons name="arrow-back" size={22} color="#1E293B" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.headerName}>John Doe</Text>
-          <Text style={styles.headerStatus}>Online</Text>
+          <Text style={styles.headerStatus}>
+            {isOtherTyping ? 'typing...' : 'Online'}
+          </Text>
         </View>
         <TouchableOpacity 
           style={styles.headerIcon}
           onPress={handleOptions}
         >
-          <Ionicons name="ellipsis-vertical" size={24} color="#1E293B" />
+          <Ionicons name="ellipsis-vertical" size={22} color="#1E293B" />
         </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
         {/* Messages */}
         <FlatList
@@ -176,6 +273,7 @@ const ChatScreen = ({ route }) => {
 
         {/* Input */}
         <View style={styles.inputContainer}>
+          {renderAttachment()}
           <TouchableOpacity 
             style={styles.attachButton}
             onPress={handleAttachment}
@@ -186,23 +284,23 @@ const ChatScreen = ({ route }) => {
             style={styles.input}
             placeholder="Type a message..."
             value={message}
-            onChangeText={setMessage}
+            onChangeText={handleTyping}
             multiline
             maxLength={500}
           />
           <TouchableOpacity 
             style={[
               styles.sendButton,
-              !message.trim() && styles.sendButtonDisabled
+              (!message.trim() && !attachment) && styles.sendButtonDisabled
             ]}
             onPress={sendMessage}
-            disabled={!message.trim()}
+            disabled={(!message.trim() && !attachment) || isLoading}
           >
-            <Ionicons 
-              name="send" 
-              size={24} 
-              color={message.trim() ? '#6366F1' : '#94A3B8'} 
-            />
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name="send" size={20} color="#FFFFFF" />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -213,23 +311,24 @@ const ChatScreen = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
+    paddingTop: 40,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    backgroundColor: '#fff',
   },
   backButton: {
-    padding: 4,
+    marginRight: 16,
   },
   headerInfo: {
     flex: 1,
-    marginLeft: 12,
   },
   headerName: {
     fontSize: 16,
@@ -237,8 +336,8 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   headerStatus: {
-    fontSize: 14,
-    color: '#10B981',
+    fontSize: 12,
+    color: '#64748B',
   },
   headerIcon: {
     padding: 4,
@@ -265,30 +364,35 @@ const styles = StyleSheet.create({
   },
   userBubble: {
     backgroundColor: '#6366F1',
-    borderBottomRightRadius: 4,
   },
   sellerBubble: {
-    backgroundColor: '#F1F5F9',
-    borderBottomLeftRadius: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   messageText: {
     fontSize: 15,
-    lineHeight: 20,
-    color: '#fff',
+    color: '#1E293B',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
   },
   timestamp: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 4,
-    alignSelf: 'flex-end',
+    fontSize: 11,
+    color: '#64748B',
+  },
+  readReceipt: {
+    marginLeft: 4,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
-    backgroundColor: '#fff',
   },
   attachButton: {
     padding: 8,
@@ -298,17 +402,78 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    maxHeight: 100,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F1F5F9',
     borderRadius: 20,
     fontSize: 15,
     color: '#1E293B',
+    maxHeight: 100,
   },
   sendButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sendButtonDisabled: {
-    opacity: 0.5,
+    backgroundColor: '#94A3B8',
+  },
+  attachmentPreview: {
+    position: 'absolute',
+    bottom: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  attachmentImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+  },
+  documentPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    padding: 12,
+    borderRadius: 8,
+  },
+  documentName: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#1E293B',
+  },
+  documentSize: {
+    fontSize: 12,
+    color: '#64748B',
+    marginLeft: 8,
+  },
+  removeAttachment: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 4,
+  },
+  attachmentContainer: {
+    marginBottom: 8,
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+  },
+  messageDocument: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    padding: 12,
+    borderRadius: 8,
   },
 });
 

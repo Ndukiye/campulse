@@ -4,8 +4,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
+import { useAuth } from '../context/AuthContext';
 
-// Import screens (we'll create these next)
+// Import screens
 import HomeScreen from '../screens/HomeScreen';
 import BrowseScreen from '../screens/BrowseScreen';
 import SellScreen from '../screens/SellScreen';
@@ -15,6 +16,9 @@ import ListingDetailsScreen from '../screens/ListingDetailsScreen';
 import ChatScreen from '../screens/ChatScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AuthScreen from '../screens/AuthScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
+import HelpSupportScreen from '../screens/HelpSupportScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -35,6 +39,9 @@ const MainTabs = () => {
               break;
             case 'Sell':
               iconName = focused ? 'add-circle' : 'add-circle-outline';
+              break;
+            case 'Profile':
+              iconName = focused ? 'person' : 'person-outline';
               break;
             default:
               iconName = 'home';
@@ -68,22 +75,47 @@ const MainTabs = () => {
           title: 'Sell',
         }}
       />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{
+          title: 'Profile',
+        }}
+      />
     </Tab.Navigator>
   );
 };
 
 const AppNavigator = () => {
-  // TODO: Add authentication state check
-  const isAuthenticated = true; // Temporarily set to true for development
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return null; // Or a loading screen
+  }
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator 
+        screenOptions={{ 
+          headerShown: false,
+          headerTitleStyle: {
+            fontSize: 18,
+          },
+        }}
+      >
         {!isAuthenticated ? (
-          <Stack.Screen name="Auth" component={AuthScreen} />
+          <Stack.Screen 
+            name="Auth" 
+            component={AuthScreen}
+            options={{ headerShown: false }}
+          />
         ) : (
           <>
-            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen 
+              name="Main" 
+              component={MainTabs}
+              options={{ headerShown: false }}
+            />
             <Stack.Screen 
               name="ListingDetails" 
               component={ListingDetailsScreen}
@@ -97,17 +129,32 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="Settings" 
               component={SettingsScreen}
-              options={{ headerShown: true }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen 
               name="Messages" 
               component={MessagesScreen}
-              options={{ headerShown: true }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen 
               name="Profile" 
               component={ProfileScreen}
-              options={{ headerShown: true }}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Notifications" 
+              component={NotificationsScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="PrivacySecurity" 
+              component={PrivacySecurityScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="HelpSupport" 
+              component={HelpSupportScreen}
+              options={{ headerShown: false }}
             />
           </>
         )}
