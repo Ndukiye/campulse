@@ -28,33 +28,65 @@ const AuthScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    console.log('[AuthScreen] Submit clicked', { isLogin, formData });
+
     if (isLogin) {
       // Login logic
       if (!formData.email || !formData.password) {
-        Alert.alert('Error', 'Please fill in all fields');
+        console.warn('[AuthScreen] Missing email or password');
+        window.alert('Please fill in all fields');
         return;
       }
-      setIsSubmitting(true);
-      const { error } = await signIn(formData.email, formData.password);
-      setIsSubmitting(false);
-      if (error) {
-        Alert.alert('Error', error);
+      try {
+        setIsSubmitting(true);
+        console.log('[AuthScreen] Calling signIn');
+        const { error } = await signIn(formData.email, formData.password);
+        console.log('[AuthScreen] signIn result', { error });
+        setIsSubmitting(false);
+        if (error) {
+          if (error.includes('Email not confirmed') || error.includes('email_not_confirmed')) {
+            window.alert('Please verify your email before signing in.');
+          } else if (error.includes('Invalid login credentials')) {
+            window.alert('Invalid email or password.');
+          } else {
+            window.alert(error);
+          }
+        } else {
+          window.alert('Logged in successfully');
+        }
+      } catch (e) {
+        console.error('[AuthScreen] signIn threw error', e);
+        setIsSubmitting(false);
+        window.alert('Unexpected error during sign in. Please try again.');
       }
     } else {
       // Signup logic
       if (!formData.email || !formData.password || !formData.confirmPassword || !formData.name) {
-        Alert.alert('Error', 'Please fill in all fields');
+        console.warn('[AuthScreen] Missing signup fields');
+        window.alert('Please fill in all fields');
         return;
       }
       if (formData.password !== formData.confirmPassword) {
-        Alert.alert('Error', 'Passwords do not match');
+        console.warn('[AuthScreen] Passwords do not match');
+        window.alert('Passwords do not match');
         return;
       }
-      setIsSubmitting(true);
-      const { error } = await signUp(formData.email, formData.password, formData.name);
-      setIsSubmitting(false);
-      if (error) {
-        Alert.alert('Error', error);
+      try {
+        setIsSubmitting(true);
+        console.log('[AuthScreen] Calling signUp', { email: formData.email, name: formData.name });
+        const { error } = await signUp(formData.email, formData.password, formData.name);
+        console.log('[AuthScreen] signUp result', { error });
+        setIsSubmitting(false);
+        if (error) {
+          window.alert(error);
+        } else {
+          window.alert('Account created successfully! If email verification is enabled, please verify your email before signing in.');
+          setIsLogin(true);
+        }
+      } catch (e) {
+        console.error('[AuthScreen] signUp threw error', e);
+        setIsSubmitting(false);
+        window.alert('Unexpected error during sign up. Please try again.');
       }
     }
   };
@@ -324,4 +356,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AuthScreen; 
+export default AuthScreen;

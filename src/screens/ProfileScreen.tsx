@@ -17,6 +17,29 @@ import { useNavigation } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
 import { useAuth } from '../context/AuthContext';
 
+// Types
+type TransactionStatus = 'completed' | 'pending' | 'cancelled';
+
+interface Sale {
+  id: string;
+  itemName: string;
+  buyerName: string;
+  buyerId: string;
+  price: number;
+  date: string; // ISO string
+  status: TransactionStatus;
+}
+
+interface Purchase {
+  id: string;
+  itemName: string;
+  sellerName: string;
+  sellerId: string;
+  price: number;
+  date: string; // ISO string
+  status: TransactionStatus;
+}
+
 // Mock user data
 const MOCK_USER = {
   id: '1',
@@ -63,7 +86,7 @@ const MOCK_USER_LISTINGS = [
 ];
 
 // Mock sales data
-const MOCK_SALES = [
+const MOCK_SALES: Sale[] = [
   {
     id: '1',
     itemName: 'iPhone 12 Pro',
@@ -85,7 +108,7 @@ const MOCK_SALES = [
 ];
 
 // Mock purchases data
-const MOCK_PURCHASES = [
+const MOCK_PURCHASES: Purchase[] = [
   {
     id: '1',
     itemName: 'Sony Headphones',
@@ -134,30 +157,25 @@ const ProfileScreen = () => {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-              // No need to navigate - AppNavigator will handle it
-            } catch (error) {
-              console.error('Error logging out:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
-            }
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    console.log('[ProfileScreen] Logout button pressed');
+    
+    // Use window.confirm for better web compatibility
+    const confirmed = window.confirm('Are you sure you want to logout?');
+    
+    if (!confirmed) {
+      console.log('[ProfileScreen] Logout cancelled');
+      return;
+    }
+    
+    console.log('[ProfileScreen] Logout confirmed, calling signOut...');
+    try {
+      await signOut();
+      console.log('[ProfileScreen] SignOut completed successfully');
+      // No need to navigate - AppNavigator will handle it
+    } catch (error) {
+      console.error('[ProfileScreen] Error logging out:', error);
+      window.alert('Failed to logout. Please try again.');
+    }
   };
 
   const renderEditProfileModal = () => (
@@ -289,7 +307,7 @@ const ProfileScreen = () => {
     </Modal>
   );
 
-  const renderSaleItem = ({ item }) => (
+  const renderSaleItem = ({ item }: { item: Sale }) => (
     <View style={styles.transactionCard}>
       <View style={styles.transactionHeader}>
         <Text style={styles.transactionTitle}>{item.itemName}</Text>
@@ -314,7 +332,7 @@ const ProfileScreen = () => {
     </View>
   );
 
-  const renderPurchaseItem = ({ item }) => (
+  const renderPurchaseItem = ({ item }: { item: Purchase }) => (
     <View style={styles.transactionCard}>
       <View style={styles.transactionHeader}>
         <Text style={styles.transactionTitle}>{item.itemName}</Text>
@@ -382,7 +400,7 @@ const ProfileScreen = () => {
       case 'sales':
         return (
           <View style={styles.transactionsContainer}>
-            <FlatList
+            <FlatList<Sale>
               data={MOCK_SALES}
               renderItem={renderSaleItem}
               keyExtractor={(item) => item.id}
@@ -393,7 +411,7 @@ const ProfileScreen = () => {
       case 'purchases':
         return (
           <View style={styles.transactionsContainer}>
-            <FlatList
+            <FlatList<Purchase>
               data={MOCK_PURCHASES}
               renderItem={renderPurchaseItem}
               keyExtractor={(item) => item.id}
@@ -1008,4 +1026,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreen; 
+export default ProfileScreen;

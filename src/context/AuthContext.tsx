@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { signIn as authSignIn, signOut as authSignOut, signUp as authSignUp, getCurrentUser } from '../services/authService';
+import { getProfileById, upsertProfile } from '../services/profileService';
 
 type User = {
   id: string;
-  email: string;
-  name?: string;
+  email: string | null;
+  name?: string | null;
 } | null;
 
 type AuthContextType = {
@@ -27,89 +29,159 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-// Simple mock users for development - replace with real backend later
-const MOCK_USERS = [
-  { id: '1', email: 'test@campulse.com', password: 'password123', name: 'Test User' },
-  { id: '2', email: 'demo@campulse.com', password: 'demo123', name: 'Demo User' },
-];
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User>(null);
   const [loading, setLoading] = useState(true);
 
+  // Debug authentication state changes
+  React.useEffect(() => {
+    console.log('[Auth] State changed:', { 
+      user: user ? { id: user.id, email: user.email, name: user.name } : null, 
+      isAuthenticated: !!user, 
+      loading 
+    });
+  }, [user, loading]);
+
   useEffect(() => {
-    // Check for stored user session
-    checkStoredSession();
+    const initSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const supaUser = data.session?.user ?? null;
+        setUser(
+          supaUser
+            ? {
+                id: supaUser.id,
+                email: supaUser.email ?? null,
+                name: (supaUser.user_metadata as any)?.full_name ?? null,
+              }
+            : null
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+    initSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const supaUser = session?.user ?? null;
+      setUser(
+        supaUser
+          ? {
+              id: supaUser.id,
+              email: supaUser.email ?? null,
+              name: (supaUser.user_metadata as any)?.full_name ?? null,
+            }
+          : null
+      );
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  const checkStoredSession = async () => {
-    try {
-      const storedUser = await AsyncStorage.getItem('campulse_user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-    } catch (error) {
-      console.error('Error checking stored session:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const signIn = async (email: string, password: string) => {
-    try {
-      // Simple mock authentication - replace with real backend
-      const foundUser = MOCK_USERS.find(u => u.email === email && u.password === password);
-      
-      if (!foundUser) {
-        return { error: 'Invalid email or password' };
+    const res = await authSignIn(email, password);
+    if (res.error) return { error: res.error };
+
+    const u = res.user ?? (await getCurrentUser());
+    if (u) {
+      // Set user immediately so navigation reacts without waiting for onAuthStateChange
+      setUser({
+        id: u.id,
+        email: u.email ?? null,
+        name: (u.user_metadata as any)?.full_name ?? null,
+      });
+
+      try {
+        const profile = await getProfileById(u.id);
+        if (!profile.data) {
+          await upsertProfile({
+            id: u.id,
+            email: u.email ?? '',
+            full_name: (u.user_metadata as any)?.full_name ?? null,
+          });
+        }
+      } catch (e) {
+        console.warn('[Auth] Profile ensure failed:', e);
       }
-
-      const userData = { id: foundUser.id, email: foundUser.email, name: foundUser.name };
-      setUser(userData);
-      await AsyncStorage.setItem('campulse_user', JSON.stringify(userData));
-      
-      return { error: null };
-    } catch (error) {
-      return { error: 'An unexpected error occurred' };
     }
-  };
 
-  const signOut = async () => {
-    try {
-      await AsyncStorage.removeItem('campulse_user');
-      setUser(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
-      throw error;
-    }
+    return { error: null };
   };
 
   const signUp = async (email: string, password: string, name?: string) => {
+    const res = await authSignUp(email, password, name);
+    if (res.error) return { error: res.error };
+
+    const u = res.user; // may exist even if email confirmation is required
+    if (u) {
+      console.log('[Auth] User created:', {
+        id: u.id,
+        email: u.email,
+        user_metadata: u.user_metadata,
+        raw_user_meta_data: (u as any).raw_user_meta_data,
+        name_param: name,
+        has_session: !!res.session,
+        full_user_object: JSON.stringify(u, null, 2)
+      });
+
+      // If email confirmation is enabled, there will be no session here.
+      // In that case, skip profile reads/writes (RLS will block them anyway)
+      // and rely on the DB trigger to create the profile.
+      if (!res.session) {
+        console.log('[Auth] No session after signUp (email verification likely). Skipping profile upsert and waiting for user to sign in.');
+        return { error: null };
+      }
+
+      try {
+        // Check if profile already exists (from trigger)
+        const existingProfile = await getProfileById(u.id);
+        console.log('[Auth] Existing profile check:', existingProfile);
+
+        if (!existingProfile.data) {
+          console.log('[Auth] Creating profile via upsert...');
+          const upsertResult = await upsertProfile({
+            id: u.id,
+            email: u.email ?? '',
+            full_name: name ?? (u.user_metadata as any)?.full_name ?? 'New User',
+          });
+          console.log('[Auth] Profile upsert result:', upsertResult);
+        } else {
+          console.log('[Auth] Profile already exists, checking name...');
+          const currentName = existingProfile.data.full_name;
+          const desiredName = name ?? (u.user_metadata as any)?.full_name;
+          
+          console.log('[Auth] Name comparison:', { currentName, desiredName, shouldUpdate: currentName !== desiredName });
+          
+          // Always update if we have a name and it's different from current
+          if (desiredName && currentName !== desiredName) {
+            const updateResult = await upsertProfile({
+              id: u.id,
+              email: u.email ?? '',
+              full_name: desiredName,
+            });
+            console.log('[Auth] Profile update result:', updateResult);
+          }
+        }
+      } catch (e) {
+        console.error('[Auth] Profile upsert on signup failed:', e);
+      }
+    }
+
+    return { error: null };
+  };
+
+  const signOut = async () => {
+    console.log('[Auth] Starting logout process...');
     try {
-      // Simple mock registration - replace with real backend
-      const existingUser = MOCK_USERS.find(u => u.email === email);
-      
-      if (existingUser) {
-        return { error: 'User with this email already exists' };
-      }
-
-      if (password.length < 6) {
-        return { error: 'Password must be at least 6 characters' };
-      }
-
-      // In a real app, you'd create the user in your backend
-      const newUser = { 
-        id: Date.now().toString(), 
-        email, 
-        name: name || 'New User' 
-      };
-      
-      setUser(newUser);
-      await AsyncStorage.setItem('campulse_user', JSON.stringify(newUser));
-      
-      return { error: null };
+      await authSignOut();
+      console.log('[Auth] Supabase signOut completed');
+      setUser(null);
+      console.log('[Auth] User state cleared, logout complete');
     } catch (error) {
-      return { error: 'An unexpected error occurred' };
+      console.error('[Auth] Logout error:', error);
+      throw error;
     }
   };
 
@@ -127,4 +199,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </AuthContext.Provider>
   );
-}; 
+};

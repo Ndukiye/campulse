@@ -282,7 +282,8 @@ const ListingDetailsScreen = () => {
                 {currentProduct.description}
               </Text>
             </View>
-
+       
+            /* bruhhh */
             <View style={styles.locationContainer}>
               <Text style={styles.sectionTitle}>Location</Text>
               <View style={styles.locationInfo}>
@@ -290,7 +291,8 @@ const ListingDetailsScreen = () => {
                 <Text style={styles.locationText}>Near Engineering Building, University Campus</Text>
               </View>
             </View>
-
+            */
+            
             {comments.length > 0 && (
               <View style={styles.commentsSection}>
                 <Text style={styles.sectionTitle}>Comments ({comments.length})</Text>

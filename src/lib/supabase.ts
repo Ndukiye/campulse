@@ -1,19 +1,33 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const envUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
+const envKey = (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+const extraUrl = (Constants?.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
+const extraKey = (Constants?.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+
+const supabaseUrl = envUrl || extraUrl;
+const supabaseAnonKey = envKey || extraKey;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase URL or Anon Key is missing. Please check your .env file.');
+  console.warn('[Supabase] Supabase URL or Anon Key is missing. Check .env variables.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+const isWeb = Platform.OS === 'web';
+const options: Parameters<typeof createClient>[2] = {
   auth: {
-    storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: isWeb, // allow url detection for web if needed
   },
-});
+};
+
+if (!isWeb) {
+  // Only use AsyncStorage on native; web uses localStorage by default
+  (options.auth as any).storage = AsyncStorage as any;
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, options);

@@ -89,7 +89,10 @@ const MainTabs = () => {
 const AppNavigator = () => {
   const { isAuthenticated, loading } = useAuth();
 
+  console.log('[AppNavigator] Render - isAuthenticated:', isAuthenticated, 'loading:', loading);
+
   if (loading) {
+    console.log('[AppNavigator] Showing loading state');
     return null; // Or a loading screen
   }
 
@@ -104,13 +107,17 @@ const AppNavigator = () => {
         }}
       >
         {!isAuthenticated ? (
-          <Stack.Screen 
-            name="Auth" 
-            component={AuthScreen}
-            options={{ headerShown: false }}
-          />
+          <>
+            {console.log('[AppNavigator] Rendering AuthScreen')}
+            <Stack.Screen 
+              name="Auth" 
+              component={AuthScreen}
+              options={{ headerShown: false }}
+            />
+          </>
         ) : (
           <>
+            {console.log('[AppNavigator] Rendering MainTabs')}
             <Stack.Screen 
               name="Main" 
               component={MainTabs}
@@ -163,4 +170,4 @@ const AppNavigator = () => {
   );
 };
 
-export default AppNavigator; 
+export default AppNavigator;
