@@ -3,7 +3,7 @@ export type VerificationStatus = 'none' | 'pending' | 'approved' | 'rejected';
 export interface ProfilesRow {
   id: string; // references auth.users(id)
   email: string;
-  full_name?: string | null;
+  name?: string | null;
   avatar_url?: string | null;
   bio?: string | null;
   phone?: string | null;

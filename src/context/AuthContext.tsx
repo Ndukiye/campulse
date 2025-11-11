@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ? {
                 id: supaUser.id,
                 email: supaUser.email ?? null,
-                name: (supaUser.user_metadata as any)?.full_name ?? null,
+                name: (supaUser.user_metadata as any)?.name ?? (supaUser.user_metadata as any)?.full_name ?? null,
               }
             : null
         );
@@ -69,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ? {
               id: supaUser.id,
               email: supaUser.email ?? null,
-              name: (supaUser.user_metadata as any)?.full_name ?? null,
+            name: (supaUser.user_metadata as any)?.name ?? (supaUser.user_metadata as any)?.full_name ?? null,
             }
           : null
       );
@@ -90,7 +90,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser({
         id: u.id,
         email: u.email ?? null,
-        name: (u.user_metadata as any)?.full_name ?? null,
+        name: (u.user_metadata as any)?.name ?? (u.user_metadata as any)?.full_name ?? null,
       });
 
       try {
@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await upsertProfile({
             id: u.id,
             email: u.email ?? '',
-            full_name: (u.user_metadata as any)?.full_name ?? null,
+            name: (u.user_metadata as any)?.name ?? (u.user_metadata as any)?.full_name ?? null,
           });
         }
       } catch (e) {
@@ -144,13 +144,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const upsertResult = await upsertProfile({
             id: u.id,
             email: u.email ?? '',
-            full_name: name ?? (u.user_metadata as any)?.full_name ?? 'New User',
+            name: name ?? (u.user_metadata as any)?.name ?? (u.user_metadata as any)?.full_name ?? 'New User',
           });
           console.log('[Auth] Profile upsert result:', upsertResult);
         } else {
           console.log('[Auth] Profile already exists, checking name...');
-          const currentName = existingProfile.data.full_name;
-          const desiredName = name ?? (u.user_metadata as any)?.full_name;
+          const currentName = existingProfile.data.name;
+          const desiredName = name ?? (u.user_metadata as any)?.name ?? (u.user_metadata as any)?.full_name;
           
           console.log('[Auth] Name comparison:', { currentName, desiredName, shouldUpdate: currentName !== desiredName });
           
@@ -159,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const updateResult = await upsertProfile({
               id: u.id,
               email: u.email ?? '',
-              full_name: desiredName,
+              name: desiredName,
             });
             console.log('[Auth] Profile update result:', updateResult);
           }

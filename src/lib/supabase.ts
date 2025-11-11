@@ -14,6 +14,10 @@ const supabaseAnonKey = envKey || extraKey;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('[Supabase] Supabase URL or Anon Key is missing. Check .env variables.');
+} else {
+  const redact = (s: string) => (s.length > 8 ? `${s.slice(0, 6)}…${s.slice(-4)}` : '***');
+  console.log('[Supabase] Using project URL:', supabaseUrl);
+  console.log('[Supabase] Using anon key:', redact(supabaseAnonKey));
 }
 
 const isWeb = Platform.OS === 'web';

@@ -14,7 +14,8 @@ export async function signUp(email: string, password: string, full_name?: string
     email,
     password,
     options: {
-      data: { full_name },
+      // send 'name' as canonical; keep 'full_name' for backward compatibility
+      data: { name: full_name, full_name },
     },
   });
   return {

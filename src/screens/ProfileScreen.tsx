@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,14 @@ import {
   Alert,
   Modal,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
 import { useAuth } from '../context/AuthContext';
+import type { ProfilesRow } from '../types/database';
+import { getProfileById, upsertProfile } from '../services/profileService';
 
 // Types
 type TransactionStatus = 'completed' | 'pending' | 'cancelled';
@@ -39,6 +42,14 @@ interface Purchase {
   date: string; // ISO string
   status: TransactionStatus;
 }
+
+type EditableProfile = {
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  bio: string;
+};
 
 // Mock user data
 const MOCK_USER = {
@@ -131,11 +142,70 @@ const MOCK_PURCHASES: Purchase[] = [
 
 const ProfileScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'listings' | 'sales' | 'purchases'>('listings');
   const [showEditProfile, setShowEditProfile] = useState(false);
-  const [editedUser, setEditedUser] = useState(MOCK_USER);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [profile, setProfile] = useState<ProfilesRow | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [editedProfile, setEditedProfile] = useState<EditableProfile>({
+    name: '',
+    email: '',
+    phone: '',
+    location: '',
+    bio: '',
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      if (!user?.id) {
+        setProfile(null);
+        setEditedProfile({
+          name: user?.name ?? (user as any)?.full_name ?? user?.email ?? '',
+          email: user?.email ?? '',
+          phone: '',
+          location: '',
+          bio: '',
+        });
+        setLoadingProfile(false);
+        return;
+      }
+
+      setLoadingProfile(true);
+      try {
+        const res = await getProfileById(user.id);
+        if (!isMounted) return;
+        if (res.error) {
+          console.warn('[ProfileScreen] Failed to load profile:', res.error);
+        }
+        const fetchedProfile = res.data ?? null;
+        setProfile(fetchedProfile);
+        setEditedProfile({
+          name: fetchedProfile?.name ?? user?.name ?? (user as any)?.full_name ?? user?.email ?? '',
+          email: fetchedProfile?.email ?? user?.email ?? '',
+          phone: fetchedProfile?.phone ?? '',
+          location: fetchedProfile?.location ?? '',
+          bio: fetchedProfile?.bio ?? '',
+        });
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('[ProfileScreen] Unexpected error loading profile:', error);
+      } finally {
+        if (isMounted) {
+          setLoadingProfile(false);
+        }
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
 
   // Filter active listings and limit to 4
   const activeListings = MOCK_USER_LISTINGS
@@ -143,39 +213,101 @@ const ProfileScreen = () => {
     .slice(0, 4);
 
   const handleEditProfile = () => {
+    if (!user) return;
+    setEditedProfile({
+      name: profile?.name ?? user.name ?? (user as any)?.full_name ?? user.email ?? '',
+      email: profile?.email ?? user.email ?? '',
+      phone: profile?.phone ?? '',
+      location: profile?.location ?? '',
+      bio: profile?.bio ?? '',
+    });
     setShowEditProfile(true);
   };
 
-  const handleSaveProfile = () => {
-    // TODO: Implement API call to save profile changes
-    setShowEditProfile(false);
-    Alert.alert('Success', 'Profile updated successfully');
+  const handleSaveProfile = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'User session not found. Please sign in again.');
+      return;
+    }
+
+    const trimToNull = (value: string) => {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    };
+
+    const trimmedEmail = editedProfile.email.trim();
+    if (!trimmedEmail) {
+      Alert.alert('Validation', 'Email is required.');
+      return;
+    }
+
+    const payload = {
+      id: user.id,
+      email: trimmedEmail,
+      name: trimToNull(editedProfile.name) ?? null,
+      phone: trimToNull(editedProfile.phone),
+      location: trimToNull(editedProfile.location),
+      bio: trimToNull(editedProfile.bio),
+    };
+
+    setSavingProfile(true);
+    try {
+      const { data, error } = await upsertProfile(payload);
+      if (error) {
+        Alert.alert('Error', error);
+        return;
+      }
+
+      const updatedProfile: ProfilesRow | null = data
+        ? data
+        : profile
+        ? { ...profile, ...payload }
+        : ({ ...payload } as ProfilesRow);
+
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+        setEditedProfile({
+          name: updatedProfile.name ?? '',
+          email: updatedProfile.email ?? trimmedEmail,
+          phone: updatedProfile.phone ?? '',
+          location: updatedProfile.location ?? '',
+          bio: updatedProfile.bio ?? '',
+        });
+      }
+
+      setShowEditProfile(false);
+      Alert.alert('Success', 'Profile updated successfully.');
+    } catch (error) {
+      console.error('[ProfileScreen] Failed to update profile:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleVerificationRequest = () => {
     setShowVerificationModal(true);
   };
 
-  const handleLogout = async () => {
-    console.log('[ProfileScreen] Logout button pressed');
-    
-    // Use window.confirm for better web compatibility
-    const confirmed = window.confirm('Are you sure you want to logout?');
-    
-    if (!confirmed) {
-      console.log('[ProfileScreen] Logout cancelled');
-      return;
-    }
-    
-    console.log('[ProfileScreen] Logout confirmed, calling signOut...');
-    try {
-      await signOut();
-      console.log('[ProfileScreen] SignOut completed successfully');
-      // No need to navigate - AppNavigator will handle it
-    } catch (error) {
-      console.error('[ProfileScreen] Error logging out:', error);
-      window.alert('Failed to logout. Please try again.');
-    }
+  const handleLogout = () => {
+    Alert.alert('Log out', 'Are you sure you want to log out?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+          } catch (error) {
+            console.error('[ProfileScreen] Error logging out:', error);
+            Alert.alert('Error', 'Failed to log out. Please try again.');
+          }
+        },
+      },
+    ]);
   };
 
   const renderEditProfileModal = () => (
@@ -189,7 +321,7 @@ const ProfileScreen = () => {
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Edit Profile</Text>
-            <TouchableOpacity onPress={() => setShowEditProfile(false)}>
+            <TouchableOpacity onPress={() => setShowEditProfile(false)} disabled={savingProfile}>
               <Ionicons name="close" size={24} color="#1E293B" />
             </TouchableOpacity>
           </View>
@@ -198,53 +330,67 @@ const ProfileScreen = () => {
               <Text style={styles.label}>Name</Text>
               <TextInput
                 style={styles.input}
-                value={editedUser.name}
-                onChangeText={(text) => setEditedUser({ ...editedUser, name: text })}
+                value={editedProfile.name}
+                onChangeText={(text) => setEditedProfile((prev) => ({ ...prev, name: text }))}
                 placeholder="Enter your name"
+                editable={!savingProfile}
               />
             </View>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
-                value={editedUser.email}
-                onChangeText={(text) => setEditedUser({ ...editedUser, email: text })}
+                value={editedProfile.email}
+                onChangeText={(text) => setEditedProfile((prev) => ({ ...prev, email: text }))}
                 placeholder="Enter your email"
                 keyboardType="email-address"
+                autoCapitalize="none"
+                editable={!savingProfile}
               />
             </View>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Phone</Text>
               <TextInput
                 style={styles.input}
-                value={editedUser.phone}
-                onChangeText={(text) => setEditedUser({ ...editedUser, phone: text })}
+                value={editedProfile.phone}
+                onChangeText={(text) => setEditedProfile((prev) => ({ ...prev, phone: text }))}
                 placeholder="Enter your phone number"
                 keyboardType="phone-pad"
+                editable={!savingProfile}
               />
             </View>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Location</Text>
               <TextInput
                 style={styles.input}
-                value={editedUser.location}
-                onChangeText={(text) => setEditedUser({ ...editedUser, location: text })}
+                value={editedProfile.location}
+                onChangeText={(text) => setEditedProfile((prev) => ({ ...prev, location: text }))}
                 placeholder="Enter your location"
+                editable={!savingProfile}
               />
             </View>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Bio</Text>
               <TextInput
                 style={[styles.input, styles.bioInput]}
-                value={editedUser.bio}
-                onChangeText={(text) => setEditedUser({ ...editedUser, bio: text })}
+                value={editedProfile.bio}
+                onChangeText={(text) => setEditedProfile((prev) => ({ ...prev, bio: text }))}
                 placeholder="Tell us about yourself"
                 multiline
                 numberOfLines={4}
+                editable={!savingProfile}
               />
             </View>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile}>
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+            <TouchableOpacity
+              style={[styles.saveButton, savingProfile && styles.saveButtonDisabled]}
+              onPress={handleSaveProfile}
+              disabled={savingProfile}
+            >
+              {savingProfile ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -422,6 +568,37 @@ const ProfileScreen = () => {
     }
   };
 
+  if (loadingProfile) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4338CA" />
+      </SafeAreaView>
+    );
+  }
+
+  const displayName =
+    profile?.name ??
+    user?.name ??
+    (user as any)?.full_name ??
+    user?.email ??
+    MOCK_USER.name;
+  const displayEmail = profile?.email ?? user?.email ?? MOCK_USER.email;
+  const displayAvatar = profile?.avatar_url ?? MOCK_USER.avatar;
+  const displayRating = profile?.rating ?? MOCK_USER.rating;
+  const displayReviews = profile?.total_reviews ?? MOCK_USER.reviews;
+  const isVerified = profile?.verified ?? profile?.verification_status === 'approved';
+  const verificationStatus = profile?.verification_status ?? 'none';
+  const joinedAt =
+    profile?.created_at
+      ? new Date(profile.created_at).toLocaleDateString(undefined, {
+          month: 'long',
+          year: 'numeric',
+        })
+      : MOCK_USER.joinDate;
+  const displayBio = profile?.bio ?? '';
+  const displayPhone = profile?.phone ?? '';
+  const displayLocation = profile?.location ?? '';
+
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
@@ -431,26 +608,34 @@ const ProfileScreen = () => {
             {/* Profile Header */}
             <View style={styles.header}>
               <View style={styles.avatarContainer}>
-                <Image source={{ uri: MOCK_USER.avatar }} style={styles.avatar} />
-                {MOCK_USER.isVerified && (
+                <Image source={{ uri: displayAvatar }} style={styles.avatar} />
+                {isVerified && (
                   <View style={styles.verifiedBadge}>
                     <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                   </View>
                 )}
               </View>
-              <Text style={styles.name}>{MOCK_USER.name}</Text>
-              <Text style={styles.email}>{MOCK_USER.email}</Text>
+              <Text style={styles.name}>{displayName}</Text>
+              <Text style={styles.email}>{displayEmail}</Text>
               <View style={styles.ratingContainer}>
                 <Ionicons name="star" size={16} color="#F59E0B" />
-                <Text style={styles.rating}>{MOCK_USER.rating}</Text>
-                <Text style={styles.reviews}>({MOCK_USER.reviews} reviews)</Text>
+                <Text style={styles.rating}>{displayRating}</Text>
+                <Text style={styles.reviews}>({displayReviews} reviews)</Text>
               </View>
-              <Text style={styles.joinDate}>Member since {MOCK_USER.joinDate}</Text>
+              <Text style={styles.joinDate}>Member since {joinedAt}</Text>
+              {displayLocation ? <Text style={styles.location}>{displayLocation}</Text> : null}
+              {displayPhone ? <Text style={styles.phone}>{displayPhone}</Text> : null}
+              {displayBio ? <Text style={styles.bio}>{displayBio}</Text> : null}
               <View style={styles.verificationContainer}>
-                {MOCK_USER.isVerified ? (
+                {isVerified ? (
                   <View style={styles.verifiedStatus}>
                     <Ionicons name="shield-checkmark" size={16} color="#10B981" />
                     <Text style={styles.verifiedText}>Verified Seller</Text>
+                  </View>
+                ) : verificationStatus === 'pending' ? (
+                  <View style={styles.pendingStatus}>
+                    <Ionicons name="time-outline" size={16} color="#F59E0B" />
+                    <Text style={styles.pendingText}>Verification in review</Text>
                   </View>
                 ) : (
                   <TouchableOpacity 
@@ -570,6 +755,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
   header: {
     alignItems: 'center',
     padding: 20,
@@ -608,6 +799,23 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginBottom: 8,
   },
+  location: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  phone: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  bio: {
+    fontSize: 14,
+    color: '#475569',
+    textAlign: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 16,
+  },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -644,6 +852,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#059669',
+    marginLeft: 4,
+  },
+  pendingStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  pendingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#D97706',
     marginLeft: 4,
   },
   editProfileButton: {
@@ -988,6 +1210,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 16,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
   saveButtonText: {
     color: '#FFFFFF',
