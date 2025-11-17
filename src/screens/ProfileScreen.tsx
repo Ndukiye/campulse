@@ -19,29 +19,15 @@ import { RootStackNavigationProp } from '../types/navigation';
 import { useAuth } from '../context/AuthContext';
 import type { ProfilesRow } from '../types/database';
 import { getProfileById, upsertProfile } from '../services/profileService';
-
-// Types
-type TransactionStatus = 'completed' | 'pending' | 'cancelled';
-
-interface Sale {
-  id: string;
-  itemName: string;
-  buyerName: string;
-  buyerId: string;
-  price: number;
-  date: string; // ISO string
-  status: TransactionStatus;
-}
-
-interface Purchase {
-  id: string;
-  itemName: string;
-  sellerName: string;
-  sellerId: string;
-  price: number;
-  date: string; // ISO string
-  status: TransactionStatus;
-}
+import { countProductsBySeller, getProductsBySeller, type ProductSummary } from '../services/productService';
+import {
+  countCompletedTransactionsByBuyer,
+  countCompletedTransactionsBySeller,
+  getPurchasesByBuyer,
+  getSalesBySeller,
+  type PurchaseSummary,
+  type SaleSummary,
+} from '../services/transactionService';
 
 type EditableProfile = {
   name: string;
@@ -71,75 +57,6 @@ const MOCK_USER = {
   bio: 'Student at University of Lagos. Selling items to help other students.',
 };
 
-// Mock user listings
-const MOCK_USER_LISTINGS = [
-  {
-    id: '1',
-    title: 'iPhone 12 Pro',
-    price: 699.99,
-    image: 'https://picsum.photos/seed/iphone/400/500',
-    status: 'active',
-  },
-  {
-    id: '2',
-    title: 'Nike Air Max',
-    price: 89.99,
-    image: 'https://picsum.photos/seed/nike/400/500',
-    status: 'sold',
-  },
-  {
-    id: '3',
-    title: 'MacBook Pro 2020',
-    price: 1299.99,
-    image: 'https://picsum.photos/seed/macbook/400/500',
-    status: 'active',
-  },
-];
-
-// Mock sales data
-const MOCK_SALES: Sale[] = [
-  {
-    id: '1',
-    itemName: 'iPhone 12 Pro',
-    buyerName: 'Sarah Johnson',
-    buyerId: 'buyer1',
-    price: 699.99,
-    date: '2024-03-15',
-    status: 'completed',
-  },
-  {
-    id: '2',
-    itemName: 'Nike Air Max',
-    buyerName: 'Mike Wilson',
-    buyerId: 'buyer2',
-    price: 89.99,
-    date: '2024-03-10',
-    status: 'completed',
-  },
-];
-
-// Mock purchases data
-const MOCK_PURCHASES: Purchase[] = [
-  {
-    id: '1',
-    itemName: 'Sony Headphones',
-    sellerName: 'Alex Brown',
-    sellerId: 'seller1',
-    price: 199.99,
-    date: '2024-03-18',
-    status: 'completed',
-  },
-  {
-    id: '2',
-    itemName: 'Gaming Mouse',
-    sellerName: 'Emma Davis',
-    sellerId: 'seller2',
-    price: 49.99,
-    date: '2024-03-12',
-    status: 'completed',
-  },
-];
-
 const ProfileScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
   const { signOut, user } = useAuth();
@@ -156,6 +73,12 @@ const ProfileScreen = () => {
     location: '',
     bio: '',
   });
+  const [stats, setStats] = useState({ listings: 0, sales: 0, purchases: 0 });
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [listings, setListings] = useState<ProductSummary[]>([]);
+  const [sales, setSales] = useState<SaleSummary[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseSummary[]>([]);
+  const [loadingLists, setLoadingLists] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -207,10 +130,120 @@ const ProfileScreen = () => {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadStats = async () => {
+      if (!user?.id) {
+        if (isMounted) {
+          setStats({ listings: 0, sales: 0, purchases: 0 });
+          setLoadingStats(false);
+        }
+        return;
+      }
+
+      setLoadingStats(true);
+      try {
+        const [listingsRes, salesRes, purchasesRes] = await Promise.all([
+          countProductsBySeller(user.id),
+          countCompletedTransactionsBySeller(user.id),
+          countCompletedTransactionsByBuyer(user.id),
+        ]);
+
+        if (!isMounted) return;
+
+        if (listingsRes.error) {
+          console.warn('[ProfileScreen] Failed to count listings:', listingsRes.error);
+        }
+        if (salesRes.error) {
+          console.warn('[ProfileScreen] Failed to count sales:', salesRes.error);
+        }
+        if (purchasesRes.error) {
+          console.warn('[ProfileScreen] Failed to count purchases:', purchasesRes.error);
+        }
+
+        setStats({
+          listings: listingsRes.count ?? 0,
+          sales: salesRes.count ?? 0,
+          purchases: purchasesRes.count ?? 0,
+        });
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('[ProfileScreen] Unexpected error loading stats:', error);
+        setStats({ listings: 0, sales: 0, purchases: 0 });
+      } finally {
+        if (isMounted) {
+          setLoadingStats(false);
+        }
+      }
+    };
+
+    loadStats();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadLists = async () => {
+      if (!user?.id) {
+        if (isMounted) {
+          setListings([]);
+          setSales([]);
+          setPurchases([]);
+          setLoadingLists(false);
+        }
+        return;
+      }
+
+      setLoadingLists(true);
+      try {
+        const [listingsRes, salesRes, purchasesRes] = await Promise.all([
+          getProductsBySeller(user.id, 20),
+          getSalesBySeller(user.id, 20),
+          getPurchasesByBuyer(user.id, 20),
+        ]);
+
+        if (!isMounted) return;
+
+        if (listingsRes.error) {
+          console.warn('[ProfileScreen] Failed to fetch listings:', listingsRes.error);
+        }
+        if (salesRes.error) {
+          console.warn('[ProfileScreen] Failed to fetch sales:', salesRes.error);
+        }
+        if (purchasesRes.error) {
+          console.warn('[ProfileScreen] Failed to fetch purchases:', purchasesRes.error);
+        }
+
+        setListings(listingsRes.data ?? []);
+        setSales(salesRes.data ?? []);
+        setPurchases(purchasesRes.data ?? []);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('[ProfileScreen] Unexpected error loading lists:', error);
+        setListings([]);
+        setSales([]);
+        setPurchases([]);
+      } finally {
+        if (isMounted) {
+          setLoadingLists(false);
+        }
+      }
+    };
+
+    loadLists();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
   // Filter active listings and limit to 4
-  const activeListings = MOCK_USER_LISTINGS
-    .filter(listing => listing.status === 'active')
-    .slice(0, 4);
+  const listingPreview = listings.slice(0, 4);
 
   const handleEditProfile = () => {
     if (!user) return;
@@ -233,7 +266,7 @@ const ProfileScreen = () => {
     const trimToNull = (value: string) => {
       const trimmed = value.trim();
       return trimmed.length > 0 ? trimmed : null;
-    };
+  };
 
     const trimmedEmail = editedProfile.email.trim();
     if (!trimmedEmail) {
@@ -255,9 +288,9 @@ const ProfileScreen = () => {
       const { data, error } = await upsertProfile(payload);
       if (error) {
         Alert.alert('Error', error);
-        return;
-      }
-
+      return;
+    }
+    
       const updatedProfile: ProfilesRow | null = data
         ? data
         : profile
@@ -299,12 +332,12 @@ const ProfileScreen = () => {
         text: 'Log Out',
         style: 'destructive',
         onPress: async () => {
-          try {
-            await signOut();
-          } catch (error) {
-            console.error('[ProfileScreen] Error logging out:', error);
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('[ProfileScreen] Error logging out:', error);
             Alert.alert('Error', 'Failed to log out. Please try again.');
-          }
+    }
         },
       },
     ]);
@@ -389,7 +422,7 @@ const ProfileScreen = () => {
               {savingProfile ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>Save Changes</Text>
               )}
             </TouchableOpacity>
           </ScrollView>
@@ -453,55 +486,82 @@ const ProfileScreen = () => {
     </Modal>
   );
 
-  const renderSaleItem = ({ item }: { item: Sale }) => (
+  const formatStatus = (status: string) =>
+    status.charAt(0).toUpperCase() + status.slice(1);
+
+  const renderSaleItem = ({ item }: { item: SaleSummary }) => {
+    const priceValue = item.amount ?? item.price ?? 0;
+    const createdDate = item.createdAt ? new Date(item.createdAt) : null;
+    const buyerId = item.buyerId;
+
+    return (
     <View style={styles.transactionCard}>
       <View style={styles.transactionHeader}>
-        <Text style={styles.transactionTitle}>{item.itemName}</Text>
-        <Text style={styles.transactionPrice}>₦{item.price.toLocaleString()}</Text>
+          <Text style={styles.transactionTitle}>{item.productTitle}</Text>
+          <Text style={styles.transactionPrice}>
+            ₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </Text>
       </View>
       <View style={styles.transactionDetails}>
         <View style={styles.transactionUserContainer}>
           <Text style={styles.transactionLabel}>Buyer: </Text>
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('Profile', { userId: item.buyerId })}
-          >
+            {buyerId ? (
+              <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: buyerId })}>
             <Text style={styles.transactionUserName}>{item.buyerName}</Text>
           </TouchableOpacity>
+            ) : (
+              <Text style={styles.transactionUserName}>{item.buyerName}</Text>
+            )}
         </View>
-        <Text style={styles.transactionDate}>{new Date(item.date).toLocaleDateString()}</Text>
+          <Text style={styles.transactionDate}>
+            {createdDate ? createdDate.toLocaleDateString() : '—'}
+          </Text>
       </View>
       <View style={styles.transactionStatus}>
-        <Text style={[styles.statusText, styles[`status${item.status}`]]}>
-          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+          <Text style={[styles.statusText, styles[`status${item.status}`] ?? styles.statusDefault]}>
+            {formatStatus(item.status)}
         </Text>
       </View>
     </View>
   );
+  };
 
-  const renderPurchaseItem = ({ item }: { item: Purchase }) => (
+  const renderPurchaseItem = ({ item }: { item: PurchaseSummary }) => {
+    const priceValue = item.amount ?? item.price ?? 0;
+    const createdDate = item.createdAt ? new Date(item.createdAt) : null;
+    const sellerId = item.sellerId;
+
+    return (
     <View style={styles.transactionCard}>
       <View style={styles.transactionHeader}>
-        <Text style={styles.transactionTitle}>{item.itemName}</Text>
-        <Text style={styles.transactionPrice}>₦{item.price.toLocaleString()}</Text>
+          <Text style={styles.transactionTitle}>{item.productTitle}</Text>
+          <Text style={styles.transactionPrice}>
+            ₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </Text>
       </View>
       <View style={styles.transactionDetails}>
         <View style={styles.transactionUserContainer}>
           <Text style={styles.transactionLabel}>Seller: </Text>
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('Profile', { userId: item.sellerId })}
-          >
+            {sellerId ? (
+              <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: sellerId })}>
             <Text style={styles.transactionUserName}>{item.sellerName}</Text>
           </TouchableOpacity>
+            ) : (
+              <Text style={styles.transactionUserName}>{item.sellerName}</Text>
+            )}
         </View>
-        <Text style={styles.transactionDate}>{new Date(item.date).toLocaleDateString()}</Text>
+          <Text style={styles.transactionDate}>
+            {createdDate ? createdDate.toLocaleDateString() : '—'}
+          </Text>
       </View>
       <View style={styles.transactionStatus}>
-        <Text style={[styles.statusText, styles[`status${item.status}`]]}>
-          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+          <Text style={[styles.statusText, styles[`status${item.status}`] ?? styles.statusDefault]}>
+            {formatStatus(item.status)}
         </Text>
       </View>
     </View>
   );
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -522,53 +582,81 @@ const ProfileScreen = () => {
                 <Ionicons name="chevron-forward" size={16} color="#4338CA" />
               </TouchableOpacity>
             </View>
+            {listings.length === 0 ? (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name="cube-outline" size={40} color="#94A3B8" />
+                <Text style={styles.emptyStateTitle}>No listings yet</Text>
+                <Text style={styles.emptyStateSubtitle}>Create your first listing to start selling.</Text>
+              </View>
+            ) : (
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.listingsCarousel}
             >
-              {activeListings.map((item) => (
+                {listingPreview.map((item) => {
+                  const imageUrl = item.images?.[0] ?? 'https://placehold.co/400x500?text=CamPulse';
+                  const priceValue = item.price ?? 0;
+                  return (
                 <TouchableOpacity
                   key={item.id}
                   style={styles.listingCard}
                   onPress={() => navigation.navigate('ListingDetails', { listingId: item.id })}
                 >
-                  <Image source={{ uri: item.image }} style={styles.listingImage} />
+                      <Image source={{ uri: imageUrl }} style={styles.listingImage} />
                   <View style={styles.listingInfo}>
                     <Text style={styles.listingTitle} numberOfLines={2}>{item.title}</Text>
-                    <Text style={styles.listingPrice}>₦{item.price.toLocaleString()}</Text>
+                        <Text style={styles.listingPrice}>
+                          ₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </Text>
                   </View>
                 </TouchableOpacity>
-              ))}
+                  );
+                })}
             </ScrollView>
+            )}
           </View>
         );
       case 'sales':
         return (
           <View style={styles.transactionsContainer}>
-            <FlatList<Sale>
-              data={MOCK_SALES}
+            <FlatList<SaleSummary>
+              data={sales}
               renderItem={renderSaleItem}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.transactionsList}
+              ListEmptyComponent={
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="trending-up-outline" size={40} color="#94A3B8" />
+                  <Text style={styles.emptyStateTitle}>No sales yet</Text>
+                  <Text style={styles.emptyStateSubtitle}>Completed sales will appear here.</Text>
+                </View>
+              }
             />
           </View>
         );
       case 'purchases':
         return (
           <View style={styles.transactionsContainer}>
-            <FlatList<Purchase>
-              data={MOCK_PURCHASES}
+            <FlatList<PurchaseSummary>
+              data={purchases}
               renderItem={renderPurchaseItem}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.transactionsList}
+              ListEmptyComponent={
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="cart-outline" size={40} color="#94A3B8" />
+                  <Text style={styles.emptyStateTitle}>No purchases yet</Text>
+                  <Text style={styles.emptyStateSubtitle}>Your purchases will appear here.</Text>
+                </View>
+              }
             />
           </View>
         );
     }
   };
 
-  if (loadingProfile) {
+  if (loadingProfile || loadingStats || loadingLists) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4338CA" />
@@ -659,17 +747,17 @@ const ProfileScreen = () => {
             {/* Stats Section */}
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{MOCK_USER.stats.listings}</Text>
+                <Text style={styles.statValue}>{stats.listings}</Text>
                 <Text style={styles.statLabel}>Listings</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{MOCK_USER.stats.sales}</Text>
+                <Text style={styles.statValue}>{stats.sales}</Text>
                 <Text style={styles.statLabel}>Sales</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{MOCK_USER.stats.purchases}</Text>
+                <Text style={styles.statValue}>{stats.purchases}</Text>
                 <Text style={styles.statLabel}>Purchases</Text>
               </View>
             </View>
@@ -979,6 +1067,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E293B',
   },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  emptyStateTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginTop: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    marginTop: 4,
+  },
   showMoreButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1155,6 +1261,14 @@ const styles = StyleSheet.create({
   statuscancelled: {
     backgroundColor: '#FEE2E2',
     color: '#DC2626',
+  },
+  statusrefunded: {
+    backgroundColor: '#E0F2FE',
+    color: '#0369A1',
+  },
+  statusDefault: {
+    backgroundColor: '#E2E8F0',
+    color: '#475569',
   },
   modalContainer: {
     flex: 1,

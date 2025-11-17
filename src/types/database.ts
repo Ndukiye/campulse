@@ -20,3 +20,25 @@ export interface ProfilesRow {
 
 export type ProfilesInsert = Omit<ProfilesRow, 'created_at' | 'updated_at'>;
 export type ProfilesUpdate = Partial<ProfilesRow>;
+
+export interface CategoriesRow {
+  id: string;
+  name: string;
+  created_at?: string | null;
+}
+
+export interface ProductsRow {
+  id: string;
+  seller_id: string;
+  title: string;
+  description: string;
+  price: number;
+  category: string;
+  condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
+  images: string[] | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export type ProductsInsert = Omit<ProductsRow, 'id' | 'created_at' | 'updated_at'>;
+export type ProductsUpdate = Partial<ProductsRow> & { id: string };

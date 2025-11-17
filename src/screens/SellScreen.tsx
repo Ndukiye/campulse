@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,166 +13,344 @@ import {
   Alert,
   Modal,
   FlatList,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
-import { APP_CATEGORIES } from '../constants/categories';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-
-// We will use these later for category and condition pickers
-// import { APP_CATEGORIES } from '../constants/categories'; 
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../context/AuthContext';
+import {
+  getProductsBySeller,
+  createProduct,
+  deleteProduct,
+  updateProduct,
+  type ProductSummary,
+} from '../services/productService';
+import { RootStackNavigationProp } from '../types/navigation';
+import type { ProductsInsert } from '../types/database';
+import { APP_CATEGORIES } from '../constants/categories';
+import { ensureRemoteImageUrls } from '../services/storageService';
 
 const CONDITION_OPTIONS = [
-  { label: 'New', value: 'New' },
-  { label: 'Like New', value: 'Like New' },
-  { label: 'Good', value: 'Good' },
-  { label: 'Fair', value: 'Fair' },
-  { label: 'Used', value: 'Used' },
-];
-
-// Mock user listings - replace with actual data management later
-const MOCK_USER_LISTINGS = [
-  {
-    id: '1',
-    title: 'iPhone 12 Pro',
-    description: 'Excellent condition, barely used',
-    price: 699.99,
-    category: 'Electronics',
-    condition: 'Like New',
-    image: 'https://picsum.photos/seed/iphone/400/500',
-    sellerVerified: true,
-    datePosted: '2024-03-15',
-  },
-  {
-    id: '2',
-    title: 'Nike Air Max',
-    description: 'Size 10, worn twice',
-    price: 89.99,
-    category: 'Clothing',
-    condition: 'Good',
-    image: 'https://picsum.photos/seed/nike/400/500',
-    sellerVerified: true,
-    datePosted: '2024-03-14',
-  },
+  { label: 'New', value: 'new' },
+  { label: 'Like New', value: 'like-new' },
+  { label: 'Good', value: 'good' },
+  { label: 'Fair', value: 'fair' },
+  { label: 'Poor', value: 'poor' },
 ];
 
 const SellScreen = () => {
+  const navigation = useNavigation<RootStackNavigationProp>();
+  const { user } = useAuth();
+
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [userListings, setUserListings] = useState(MOCK_USER_LISTINGS);
+  const [editingItem, setEditingItem] = useState<ProductSummary | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [category, setCategory] = useState(APP_CATEGORIES[0]?.name || '');
-  const [condition, setCondition] = useState(CONDITION_OPTIONS[0]?.value || '');
-  const [image, setImage] = useState<string | null>(null);
+  const [condition, setCondition] = useState(CONDITION_OPTIONS[0]?.value ?? 'new');
+  const [selectedCategory, setSelectedCategory] = useState(APP_CATEGORIES[0]?.name ?? '');
+  const [images, setImages] = useState<string[]>([]);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showConditionPicker, setShowConditionPicker] = useState(false);
-  const navigation = useNavigation();
 
-  const pickImage = () => {
-    // Create a file input element
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    
-    input.onchange = (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      if (target.files && target.files[0]) {
-        const file = target.files[0];
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (event.target?.result) {
-            setImage(event.target.result as string);
-          }
-        };
-        reader.readAsDataURL(file);
+  const [listings, setListings] = useState<ProductSummary[]>([]);
+  const [loadingListings, setLoadingListings] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const loadListings = useCallback(
+    async (showLoading = true) => {
+      if (!user?.id) return;
+      if (showLoading) {
+        setLoadingListings(true);
       }
-    };
-    
-    input.click();
-  };
+      const res = await getProductsBySeller(user.id, 40);
+      if (res.error) {
+        console.warn('[SellScreen] Failed to load listings:', res.error);
+      }
+      setListings(res.data ?? []);
+      if (showLoading) {
+        setLoadingListings(false);
+      }
+    },
+    [user?.id]
+  );
 
-  const handleCreateListing = () => {
-    if (!title || !description || !price || !category || !condition) {
-      Alert.alert('Validation Error', 'Please fill in all required fields, including category and condition.');
-      return;
+  useEffect(() => {
+    loadListings(true);
+  }, [loadListings]);
+
+  const onRefresh = useCallback(async () => {
+    if (!user?.id) return;
+    setRefreshing(true);
+    await loadListings(false);
+    setRefreshing(false);
+  }, [loadListings, user?.id]);
+
+  const pickImage = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Permission required', 'Please allow access to your photos to upload images.');
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        allowsMultipleSelection: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets?.length) {
+        const uris = result.assets.map((a) => a.uri).filter(Boolean) as string[];
+        setImages((prev) => [...prev, ...uris]);
+      }
+    } catch (error) {
+      console.error('[SellScreen] Image picker error:', error);
+      Alert.alert('Image Picker Error', 'Unable to select image. Please try again.');
     }
-    const newListing = {
-      id: String(Date.now()),
-      title,
-      description,
-      price: parseFloat(price),
-      category,
-      condition,
-      image: image || 'https://picsum.photos/seed/default/400/500',
-      sellerVerified: false,
-      datePosted: new Date().toISOString().split('T')[0],
-    };
-    
-    setUserListings([newListing, ...userListings]);
-    setShowCreateForm(false);
-    resetForm();
-  };
+  }, []);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setTitle('');
     setDescription('');
     setPrice('');
-    setCategory(APP_CATEGORIES[0]?.name || '');
-    setCondition(CONDITION_OPTIONS[0]?.value || '');
-    setImage(null);
-  };
+    setCondition(CONDITION_OPTIONS[0]?.value ?? 'new');
+    setImages([]);
+    setSelectedCategory(APP_CATEGORIES[0]?.name ?? '');
+    setEditingItem(null);
+  }, []);
 
-  const handleDeleteListing = (id: string) => {
-    Alert.alert(
-      'Delete Listing',
-      'Are you sure you want to delete this listing?',
-      [
+  const handleCreateListing = useCallback(async () => {
+    if (!user?.id) {
+      Alert.alert('Authentication required', 'Please sign in to create a listing.');
+      return;
+    }
+
+    if (!title.trim() || !description.trim() || !price.trim()) {
+      Alert.alert('Validation Error', 'Please fill in all required fields.');
+      return;
+    }
+
+    const parsedPrice = Number(price);
+    if (Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid price greater than zero.');
+      return;
+    }
+
+    if (!selectedCategory) {
+      Alert.alert('Validation Error', 'Please select a category.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const ensured = await ensureRemoteImageUrls(images, user.id);
+      if (ensured.error) {
+        Alert.alert('Image Upload Error', ensured.error);
+        setIsSubmitting(false);
+        return;
+      }
+      const payload: ProductsInsert = {
+        seller_id: user.id,
+        title: title.trim(),
+        description: description.trim(),
+        price: parsedPrice,
+        category: selectedCategory,
+        condition: condition as ProductsInsert['condition'],
+        images: ensured.urls,
+      };
+
+      const result = await createProduct(payload);
+      if (result.error) {
+        Alert.alert('Error', result.error);
+        return;
+      }
+
+      const created = result.data;
+      if (created) {
+        setListings((prev) => [created, ...prev]);
+      }
+
+      Alert.alert('Success', 'Your listing has been created.');
+      setShowCreateForm(false);
+      resetForm();
+    } catch (error) {
+      console.error('[SellScreen] Failed to create listing:', error);
+      Alert.alert('Error', 'Failed to create listing. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [user?.id, title, description, price, selectedCategory, condition, images, resetForm]);
+
+  const openEdit = useCallback((item: ProductSummary) => {
+    setEditingItem(item);
+    setTitle(item.title ?? '');
+    setDescription(item.description ?? '');
+    setPrice(item.price !== null && item.price !== undefined ? String(item.price) : '');
+    setSelectedCategory(item.category ?? APP_CATEGORIES[0]?.name ?? '');
+    setCondition((item.condition as string) ?? CONDITION_OPTIONS[0]?.value ?? 'new');
+    setImages(item.images ?? []);
+    setShowCreateForm(true);
+  }, []);
+
+  const handleSaveChanges = useCallback(async () => {
+    if (!user?.id || !editingItem) {
+      Alert.alert('Authentication required', 'Please sign in to edit a listing.');
+      return;
+    }
+
+    if (!title.trim() || !price.trim()) {
+      Alert.alert('Validation Error', 'Title and price are required.');
+      return;
+    }
+
+    const parsedPrice = Number(price);
+    if (Number.isNaN(parsedPrice) || parsedPrice <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid price greater than zero.');
+      return;
+    }
+
+    if (!selectedCategory) {
+      Alert.alert('Validation Error', 'Please select a category.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const ensured = await ensureRemoteImageUrls(images, user.id);
+      if (ensured.error) {
+        Alert.alert('Image Upload Error', ensured.error);
+        setIsSubmitting(false);
+        return;
+      }
+      const result = await updateProduct(
         {
-          text: 'Cancel',
-          style: 'cancel',
+          id: editingItem.id,
+          title: title.trim(),
+          description: description.trim(),
+          price: parsedPrice,
+          category: selectedCategory,
+          condition: condition as any,
+          images: ensured.urls,
         },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setUserListings(userListings.filter(listing => listing.id !== id));
+        user.id
+      );
+
+      if (result.error) {
+        Alert.alert('Error', result.error);
+        setIsSubmitting(false);
+        return;
+      }
+
+      const updated = result.data;
+      if (updated) {
+        setListings((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+      }
+
+      Alert.alert('Success', 'Your listing has been updated.');
+      setShowCreateForm(false);
+      resetForm();
+    } catch (error) {
+      console.error('[SellScreen] Failed to update listing:', error);
+      Alert.alert('Error', 'Failed to update listing. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [user?.id, editingItem, title, description, price, selectedCategory, condition, images, resetForm]);
+
+  const handleDeleteListing = useCallback(
+    (id: string) => {
+      if (!user?.id) return;
+
+      Alert.alert(
+        'Delete Listing',
+        'Are you sure you want to delete this listing?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
           },
-        },
-      ]
-    );
-  };
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              setDeletingId(id);
+              const res = await deleteProduct(id, user.id);
+              if (res.error) {
+                Alert.alert('Error', res.error);
+                setDeletingId(null);
+                return;
+              }
+              setListings((prev) => prev.filter((listing) => listing.id !== id));
+              setDeletingId(null);
+            },
+          },
+        ]
+      );
+    },
+    [user?.id]
+  );
 
-  const renderListingItem = ({ item }: { item: typeof MOCK_USER_LISTINGS[0] }) => (
-    <View style={styles.listingCard}>
-      <Image 
-        source={{ uri: item.image }} 
-        style={styles.listingImage}
-        resizeMode="cover"
-      />
-      <View style={styles.listingContent}>
-        <Text style={styles.listingTitle}>{item.title}</Text>
-        <Text style={styles.listingPrice}>${item.price.toFixed(2)}</Text>
-        <Text style={styles.listingCategory}>{item.category}</Text>
-        <Text style={styles.listingCondition}>Condition: {item.condition}</Text>
-        <Text style={styles.listingDate}>Posted: {item.datePosted}</Text>
-        <View style={styles.listingActions}>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => {/* TODO: Implement edit functionality */}}
-          >
-            <Ionicons name="pencil" size={20} color="#4338CA" />
-            <Text style={styles.actionButtonText}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDeleteListing(item.id)}
-          >
-            <Ionicons name="trash" size={20} color="#DC2626" />
-            <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
-          </TouchableOpacity>
+  const renderListingItem = useCallback(
+    ({ item }: { item: ProductSummary }) => {
+      const imageUrl = item.images?.[0] ?? 'https://placehold.co/400x500?text=CamPulse';
+      const createdDate = item.created_at ? new Date(item.created_at).toLocaleDateString() : '—';
+      const conditionLabel =
+        CONDITION_OPTIONS.find((opt) => opt.value === item.condition)?.label ?? item.condition ?? 'N/A';
+      const priceValue = item.price ?? 0;
+
+      return (
+        <View style={styles.listingCard}>
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.listingImage}
+            resizeMode="cover"
+          />
+          <View style={styles.listingContent}>
+            <Text style={styles.listingTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <Text style={styles.listingPrice}>
+              ₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </Text>
+            <Text style={styles.listingCategory}>{item.category ?? 'Uncategorized'}</Text>
+            <Text style={styles.listingCondition}>Condition: {conditionLabel}</Text>
+            <Text style={styles.listingDate}>Posted: {createdDate}</Text>
+            <View style={styles.listingActions}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.editButton]}
+                onPress={() => openEdit(item)}
+              >
+                <Ionicons name="pencil" size={20} color="#4338CA" />
+                <Text style={styles.actionButtonText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.deleteButton]}
+                onPress={() => handleDeleteListing(item.id)}
+                disabled={deletingId === item.id}
+              >
+                {deletingId === item.id ? (
+                  <ActivityIndicator size="small" color="#DC2626" />
+                ) : (
+                  <>
+                    <Ionicons name="trash" size={20} color="#DC2626" />
+                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </View>
-    </View>
+      );
+    },
+    [deletingId, handleDeleteListing]
   );
 
   const renderPickerModal = (
@@ -242,7 +420,7 @@ const SellScreen = () => {
       >
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Create New Listing</Text>
+            <Text style={styles.modalTitle}>{editingItem ? 'Edit Listing' : 'Create New Listing'}</Text>
             <TouchableOpacity 
               style={styles.closeButton}
               onPress={() => {
@@ -299,9 +477,13 @@ const SellScreen = () => {
               <Text style={styles.label}>Category*</Text>
               <TouchableOpacity
                 style={styles.pickerButton}
-                onPress={() => setShowCategoryPicker(true)}
+                onPress={() => {
+                  setShowCategoryPicker(true);
+                }}
               >
-                <Text style={styles.pickerButtonText}>{category}</Text>
+                <Text style={styles.pickerButtonText}>
+                  {selectedCategory || 'Select category'}
+                </Text>
                 <Ionicons name="chevron-down" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
@@ -318,22 +500,37 @@ const SellScreen = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Upload Image</Text>
+              <Text style={styles.label}>Upload Images</Text>
               <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
-                <Text style={styles.imagePickerButtonText}>{image ? 'Change Image' : 'Select Image'}</Text>
+                <Text style={styles.imagePickerButtonText}>Add Image(s)</Text>
               </TouchableOpacity>
-              {image && (
-                <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: image }} style={styles.imagePreview} />
-                  <TouchableOpacity style={styles.removeImageButton} onPress={() => setImage(null)}>
-                    <Text style={styles.removeImageButtonText}>Remove</Text>
-                  </TouchableOpacity>
-                </View>
+              {images.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {images.map((uri, idx) => (
+                    <View key={uri + idx} style={styles.imagePreviewContainer}>
+                      <Image source={{ uri }} style={styles.imagePreview} />
+                      <TouchableOpacity
+                        style={styles.removeImageButton}
+                        onPress={() => setImages((prev) => prev.filter((_, i) => i !== idx))}
+                      >
+                        <Text style={styles.removeImageButtonText}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
               )}
             </View>
 
-            <TouchableOpacity style={styles.submitButton} onPress={handleCreateListing}>
-              <Text style={styles.submitButtonText}>Create Listing</Text>
+            <TouchableOpacity 
+              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+              onPress={editingItem ? handleSaveChanges : handleCreateListing}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>{editingItem ? 'Save Changes' : 'Create Listing'}</Text>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -343,9 +540,11 @@ const SellScreen = () => {
         showCategoryPicker,
         () => setShowCategoryPicker(false),
         'Select Category',
-        APP_CATEGORIES.map(cat => ({ label: cat.name, value: cat.name })),
-        category,
-        setCategory
+        APP_CATEGORIES.map((cat) => ({ label: cat.name, value: cat.name })),
+        selectedCategory,
+        (value) => {
+          setSelectedCategory(value);
+        }
       )}
 
       {renderPickerModal(
@@ -381,7 +580,11 @@ const SellScreen = () => {
         </View>
       </View>
 
-      {userListings.length === 0 ? (
+      {loadingListings ? (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color="#4338CA" />
+        </View>
+      ) : listings.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="cube-outline" size={64} color="#94A3B8" />
           <Text style={styles.emptyStateText}>No listings yet</Text>
@@ -389,11 +592,14 @@ const SellScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={userListings}
+          data={listings}
           renderItem={renderListingItem}
           keyExtractor={(item) => item.id}
           numColumns={2}
           contentContainerStyle={styles.listingsContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4338CA" />
+          }
         />
       )}
 
@@ -445,6 +651,12 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -680,6 +892,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
   submitButtonText: {
     color: '#FFFFFF',
     fontSize: 18,
@@ -733,4 +948,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SellScreen; 
+export default SellScreen;
