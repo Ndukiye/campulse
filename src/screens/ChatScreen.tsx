@@ -14,35 +14,62 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
+import { useAuth } from '../context/AuthContext';
 import { pickImage, pickDocument, Attachment, formatFileSize, getFileIcon } from '../utils/chatUtils';
 import {
-  sendMessage,
+  sendMessage as sendChatMessage,
   subscribeToMessages,
   markMessagesAsRead,
   subscribeToTypingStatus,
   updateTypingStatus,
+  ensureConversation,
   Message,
 } from '../services/chatService';
+import { uploadChatAttachment } from '../services/storageService';
+import { getProfileById } from '../services/profileService';
 
-const ChatScreen = ({ route }) => {
-  const { conversationId, otherUserId } = route.params;
+const ChatScreen = () => {
+  const route = useRoute<RouteProp<import('../types/navigation').RootStackParamList, 'Chat'>>();
+  const otherUserId = route.params.userId;
   const navigation = useNavigation<RootStackNavigationProp>();
+  const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const flatListRef = useRef(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const flatListRef = useRef<FlatList<Message> | null>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [otherProfileName, setOtherProfileName] = useState<string>('');
+  const [otherProfileAvatar, setOtherProfileAvatar] = useState<string | null>(null);
+  const [otherVerified, setOtherVerified] = useState<boolean>(false);
+
+  useEffect(() => {
+    const setup = async () => {
+      if (user?.id && otherUserId) {
+        const conv = await ensureConversation(user.id, otherUserId);
+        setConversationId(conv.id);
+        const prof = await getProfileById(otherUserId);
+        if (prof.data) {
+          setOtherProfileName(prof.data.name ?? 'User');
+          setOtherProfileAvatar(prof.data.avatar_url ?? null);
+          setOtherVerified(!!prof.data.verified);
+        }
+      }
+    };
+    setup();
+  }, [user?.id, otherUserId]);
 
   useEffect(() => {
     // Subscribe to messages
+    if (!conversationId) return;
     const unsubscribeMessages = subscribeToMessages(conversationId, (newMessages) => {
       setMessages(newMessages);
-      markMessagesAsRead(conversationId, 'currentUserId'); // Replace with actual user ID
+      if (user?.id) markMessagesAsRead(conversationId, user.id);
     });
 
     // Subscribe to typing status
@@ -56,7 +83,7 @@ const ChatScreen = ({ route }) => {
       unsubscribeMessages();
       unsubscribeTyping();
     };
-  }, [conversationId, otherUserId]);
+  }, [conversationId, otherUserId, user?.id]);
 
   const handleBack = () => {
     navigation.goBack();
@@ -124,29 +151,43 @@ const ChatScreen = ({ route }) => {
     setMessage(text);
     
     // Clear existing timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
     // Set typing status to true
-    if (!isTyping) {
+    if (!isTyping && user?.id && conversationId) {
       setIsTyping(true);
-      updateTypingStatus(conversationId, 'currentUserId', true); // Replace with actual user ID
+      updateTypingStatus(conversationId, user.id, true);
     }
 
     // Set a timeout to set typing status to false
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      updateTypingStatus(conversationId, 'currentUserId', false); // Replace with actual user ID
+      if (user?.id && conversationId) updateTypingStatus(conversationId, user.id, false);
     }, 2000);
   };
 
-  const sendMessage = async () => {
+  const handleSend = async () => {
     if (!message.trim() && !attachment) return;
+    if (!conversationId) return;
 
     setIsLoading(true);
     try {
-      await sendMessage(conversationId, 'currentUserId', message.trim(), attachment);
+      if (!user?.id) {
+        Alert.alert('Sign in required', 'Please sign in to send messages.');
+        setIsLoading(false);
+        return;
+      }
+      let finalAttachment: { type: 'image' | 'document'; uri: string; name: string; size?: number; mimeType?: string } | undefined;
+      if (attachment) {
+        const up = await uploadChatAttachment(attachment.uri, user.id);
+        if (up.error || !up.url) {
+          Alert.alert('Attachment', up.error ?? 'Failed to upload attachment');
+        } else {
+          finalAttachment = { type: attachment.type, uri: up.url, name: attachment.name, size: attachment.size, mimeType: attachment.mimeType };
+        }
+      }
+      const sent = await sendChatMessage(conversationId, user.id, message.trim(), finalAttachment);
+      setMessages((prev) => [...prev, sent]);
       setMessage('');
       setAttachment(null);
     } catch (error) {
@@ -165,7 +206,7 @@ const ChatScreen = ({ route }) => {
           <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} />
         ) : (
           <View style={styles.documentPreview}>
-            <Ionicons name={getFileIcon(attachment.mimeType)} size={24} color="#6366F1" />
+            <Ionicons name={getFileIcon(attachment.mimeType) as any} size={24} color="#6366F1" />
             <Text style={styles.documentName} numberOfLines={1}>
               {attachment.name}
             </Text>
@@ -189,11 +230,11 @@ const ChatScreen = ({ route }) => {
   const renderMessage = ({ item }: { item: Message }) => (
     <View style={[
       styles.messageContainer,
-      item.senderId === 'currentUserId' ? styles.userMessage : styles.sellerMessage
+      item.senderId === user?.id ? styles.userMessage : styles.sellerMessage
     ]}>
       <View style={[
         styles.messageBubble,
-        item.senderId === 'currentUserId' ? styles.userBubble : styles.sellerBubble
+        item.senderId === user?.id ? styles.userBubble : styles.sellerBubble
       ]}>
         {item.attachment && (
           <View style={styles.attachmentContainer}>
@@ -201,7 +242,7 @@ const ChatScreen = ({ route }) => {
               <Image source={{ uri: item.attachment.url }} style={styles.messageImage} />
             ) : (
               <TouchableOpacity style={styles.messageDocument}>
-                <Ionicons name={getFileIcon(item.attachment.mimeType)} size={24} color="#6366F1" />
+                <Ionicons name={getFileIcon(item.attachment.mime_type) as any} size={24} color="#6366F1" />
                 <Text style={styles.documentName} numberOfLines={1}>
                   {item.attachment.name}
                 </Text>
@@ -217,9 +258,9 @@ const ChatScreen = ({ route }) => {
         {item.text && <Text style={styles.messageText}>{item.text}</Text>}
         <View style={styles.messageFooter}>
           <Text style={styles.timestamp}>
-            {item.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
-          {item.senderId === 'currentUserId' && (
+          {item.senderId === user?.id && (
             <Ionicons
               name={item.read ? "checkmark-done" : "checkmark"}
               size={16}
@@ -243,7 +284,13 @@ const ChatScreen = ({ route }) => {
           <Ionicons name="arrow-back" size={22} color="#1E293B" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerName}>John Doe</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {otherProfileAvatar ? (
+              <Image source={{ uri: otherProfileAvatar }} style={{ width: 24, height: 24, borderRadius: 12 }} />
+            ) : null}
+            <Text style={styles.headerName}>{otherProfileName}</Text>
+            {otherVerified && <Ionicons name="checkmark-circle" size={16} color="#10B981" />}
+          </View>
           <Text style={styles.headerStatus}>
             {isOtherTyping ? 'typing...' : 'Online'}
           </Text>
@@ -268,7 +315,11 @@ const ChatScreen = ({ route }) => {
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={() => {
+            if (messages.length > 0) {
+              flatListRef.current?.scrollToIndex({ index: messages.length - 1, animated: true });
+            }
+          }}
         />
 
         {/* Input */}
@@ -293,7 +344,7 @@ const ChatScreen = ({ route }) => {
               styles.sendButton,
               (!message.trim() && !attachment) && styles.sendButtonDisabled
             ]}
-            onPress={sendMessage}
+            onPress={handleSend}
             disabled={(!message.trim() && !attachment) || isLoading}
           >
             {isLoading ? (
@@ -477,4 +528,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ChatScreen; 
+export default ChatScreen;

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,109 +9,58 @@ import {
   TextInput,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
+import { useAuth } from '../context/AuthContext';
+import { listConversations, type ConversationSummary } from '../services/chatService';
 
-type Conversation = {
-  id: string;
-  user: {
-    id: string;
-    name: string;
-    avatar: string;
-    verified: boolean;
-  };
-  lastMessage: {
-    text: string;
-    timestamp: string;
-    unread: boolean;
-  };
-  product?: {
-    id: string;
-    title: string;
-    image: string;
-  };
-};
-
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: '1',
-    user: {
-      id: 'user1',
-      name: 'John Doe',
-      avatar: 'https://picsum.photos/seed/user1/200',
-      verified: true,
-    },
-    lastMessage: {
-      text: 'Is this still available?',
-      timestamp: '2m ago',
-      unread: true,
-    },
-    product: {
-      id: 'prod1',
-      title: 'Canon EOS R5',
-      image: 'https://picsum.photos/seed/canon/200',
-    },
-  },
-  {
-    id: '2',
-    user: {
-      id: 'user2',
-      name: 'Jane Smith',
-      avatar: 'https://picsum.photos/seed/user2/200',
-      verified: false,
-    },
-    lastMessage: {
-      text: 'I can offer ₦450,000 for it',
-      timestamp: '1h ago',
-      unread: false,
-    },
-    product: {
-      id: 'prod2',
-      title: 'Sony A7III',
-      image: 'https://picsum.photos/seed/sony/200',
-    },
-  },
-  {
-    id: '3',
-    user: {
-      id: 'user3',
-      name: 'Mike Johnson',
-      avatar: 'https://picsum.photos/seed/user3/200',
-      verified: true,
-    },
-    lastMessage: {
-      text: 'Thanks for the quick response!',
-      timestamp: '3h ago',
-      unread: false,
-    },
-    product: {
-      id: 'prod3',
-      title: 'Nikon Z6',
-      image: 'https://picsum.photos/seed/nikon/200',
-    },
-  },
-];
+type Conversation = ConversationSummary;
 
 const MessagesScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [conversations, setConversations] = useState(MOCK_CONVERSATIONS);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!user?.id) {
+        setConversations([]);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      const res = await listConversations(user.id);
+      if (!mounted) return;
+      if (res.error) {
+        setConversations([]);
+      } else {
+        setConversations(res.data ?? []);
+      }
+      setLoading(false);
+    };
+    load();
+    return () => { mounted = false; };
+  }, [user?.id]);
 
   const filteredConversations = conversations.filter(conv =>
-    conv.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.product?.title.toLowerCase().includes(searchQuery.toLowerCase())
+    (conv.otherUser.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (conv.product?.title || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const renderConversation = ({ item }: { item: Conversation }) => (
     <TouchableOpacity
       style={styles.conversationItem}
-      onPress={() => navigation.navigate('Chat', { conversationId: item.id })}
+      onPress={() => navigation.navigate('Chat', { userId: item.otherUser.id })}
     >
       <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
-        {item.user.verified && (
+        <Image source={{ uri: item.otherUser.avatar_url ?? 'https://placehold.co/200x200?text=User' }} style={styles.avatar} />
+        {item.otherUser.verified && (
           <View style={styles.verifiedBadge}>
             <Ionicons name="checkmark-circle" size={14} color="#10B981" />
           </View>
@@ -119,25 +68,25 @@ const MessagesScreen = () => {
       </View>
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
-          <Text style={styles.userName}>{item.user.name}</Text>
-          <Text style={styles.timestamp}>{item.lastMessage.timestamp}</Text>
+          <Text style={styles.userName}>{item.otherUser.name}</Text>
+          <Text style={styles.timestamp}>{item.lastMessage?.created_at ? new Date(item.lastMessage.created_at).toLocaleString() : ''}</Text>
         </View>
         <View style={styles.messageContainer}>
           <Text 
             style={[
               styles.lastMessage,
-              item.lastMessage.unread && styles.unreadMessage
+              item.unreadCount > 0 && styles.unreadMessage
             ]}
             numberOfLines={1}
           >
-            {item.lastMessage.text}
+            {item.lastMessage?.text ?? ''}
           </Text>
-          {item.lastMessage.unread && <View style={styles.unreadDot} />}
+          {item.unreadCount > 0 && <View style={styles.unreadDot} />}
         </View>
         {item.product && (
           <View style={styles.productPreview}>
             <Image 
-              source={{ uri: item.product.image }} 
+              source={{ uri: item.product.image ?? 'https://placehold.co/200x200?text=CamPulse' }} 
               style={styles.productImage}
             />
             <Text style={styles.productTitle} numberOfLines={1}>
@@ -184,7 +133,11 @@ const MessagesScreen = () => {
         )}
       </View>
 
-      {filteredConversations.length === 0 ? (
+      {loading ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator size="large" color="#6366F1" />
+        </View>
+      ) : filteredConversations.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="chatbubble-ellipses-outline" size={64} color="#94A3B8" />
           <Text style={styles.emptyStateText}>No conversations yet</Text>
@@ -372,4 +325,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MessagesScreen; 
+export default MessagesScreen;

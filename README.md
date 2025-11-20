@@ -234,3 +234,27 @@ Types: import from `src/types/database.ts` to strongly type rows and payloads.
 - Use `src/lib/supabase.ts` for the client; don’t re-initialize.
 - Database schema and types are aligned; if you change SQL, also update `src/types/database.ts`.
 - Keep small, incremental PRs per page (Auth → Profile → Listings → Messages → Favorites → Reviews → Notifications).
+
+## Backlog
+
+- Favorites
+  - Add `favorites` table in Supabase with RLS (user-only read/write)
+  - Implement service APIs: add/remove/check, list user favorites
+  - Toggle heart on Listing Details and reflect count/state across Browse/Home
+  - Optional: Favorites tab/section in Profile
+
+- Avatar Upload Integration
+  - Implement avatar change UI (tap-to-edit)
+  - Upload to `avatars` bucket at `${userId}/avatar`
+  - Persist `profiles.avatar_url` and read on profile load
+
+- Verification Enhancements
+  - Persist `matric_number`, `nin_document_url`, set `verification_status` to `pending`
+  - Admin review flow (approve/reject) and badge propagation
+
+- Messaging Realtime
+  - Replace dummy chat with Supabase conversations/messages and channels
+  - Read receipts and typing indicators
+
+- Notifications Persistence
+  - Insert notifications on events, unread counts, mark-as-read

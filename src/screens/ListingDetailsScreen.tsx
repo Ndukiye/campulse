@@ -11,11 +11,16 @@ import {
   FlatList,
   ActivityIndicator,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { RootStackNavigationProp, RootStackParamList, Product } from '../types/navigation';
-import { MOCK_PRODUCTS } from '../constants/products';
+import { RootStackNavigationProp, RootStackParamList } from '../types/navigation';
+import { getProductById, searchProducts, type ProductSummary } from '../services/productService';
+import type { ProfilesRow } from '../types/database';
+import { getProfileById } from '../services/profileService';
+import { useAuth } from '../context/AuthContext';
+import { isFavorite as checkFavorite, addFavorite, removeFavorite } from '../services/favoritesService';
 
 const { width } = Dimensions.get('window');
 
@@ -23,53 +28,91 @@ const ListingDetailsScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
   const route = useRoute<RouteProp<RootStackParamList, 'ListingDetails'>>();
   const params = route.params;
+  const { user } = useAuth();
 
-  const currentProduct: Product | undefined = useMemo(() => {
-    if (params?.product) {
-      return params.product;
-    }
-    if (params?.listingId) {
-      return MOCK_PRODUCTS.find(p => p.id === params.listingId);
-    }
-    return undefined;
-  }, [params]);
+  const [currentProduct, setCurrentProduct] = useState<ProductSummary | undefined>(undefined);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const imageCarouselRef = useRef(null);
+  const imageCarouselRef = useRef<FlatList<any> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [sellerProfile, setSellerProfile] = useState<ProfilesRow | null>(null);
+  const [sellerLoading, setSellerLoading] = useState(false);
+  const [sellerError, setSellerError] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsLoading(true);
-    if (currentProduct) {
-      const timer = setTimeout(() => {
+    const fetchProduct = async () => {
+      if (params?.listingId) {
+        setIsLoading(true);
+        const res = await getProductById(params.listingId);
+        if (res.error) {
+          setError(res.error);
+        }
+        setCurrentProduct(res.data ?? undefined);
         setIsLoading(false);
-        setError(null);
-      }, 750);
-      return () => clearTimeout(timer);
-    } else {
-      setIsLoading(false);
-    }
-  }, [currentProduct]);
+      } else {
+        setCurrentProduct(undefined);
+      }
+    };
+    fetchProduct();
+  }, [params?.listingId]);
+
+  useEffect(() => {
+    const checkFav = async () => {
+      if (user?.id && currentProduct?.id) {
+        const r = await checkFavorite(user.id, currentProduct.id);
+        setIsFavorite(!!r.data);
+      } else {
+        setIsFavorite(false);
+      }
+    };
+    checkFav();
+  }, [user?.id, currentProduct?.id]);
+
+  useEffect(() => {
+    const loadSeller = async () => {
+      if (!currentProduct?.seller_id) {
+        setSellerProfile(null);
+        setSellerError(null);
+        return;
+      }
+      setSellerLoading(true);
+      try {
+        const res = await getProfileById(currentProduct.seller_id);
+        if (res.error) {
+          setSellerError(res.error);
+        }
+        setSellerProfile(res.data ?? null);
+      } finally {
+        setSellerLoading(false);
+      }
+    };
+    loadSeller();
+  }, [currentProduct?.seller_id]);
 
   const productImages = useMemo(() => {
-    if (!currentProduct) return []; // If no product, return empty array
-    // Restore placeholder images for gallery testing purposes
-    return [
-      { id: '1', url: currentProduct.image },
-      { id: '2', url: `https://picsum.photos/seed/${currentProduct.id}/1/400/501` }, // Unique seed
-      { id: '3', url: `https://picsum.photos/seed/${currentProduct.id}/2/400/502` }, // Unique seed
-      { id: '4', url: `https://picsum.photos/seed/${currentProduct.id}/3/400/503` }, // Unique seed
-    ];
+    if (!currentProduct) return [];
+    const imgs = currentProduct.images ?? [];
+    if (imgs.length === 0) {
+      return [{ id: 'placeholder', url: 'https://placehold.co/800x600?text=CamPulse' }];
+    }
+    return imgs.map((u, idx) => ({ id: `${currentProduct.id}-${idx}`, url: u }));
   }, [currentProduct]);
 
-  const relatedProducts = useMemo(() => {
-    if (!currentProduct) return [];
-    return MOCK_PRODUCTS.filter(
-      p => p.category === currentProduct.category && p.id !== currentProduct.id
-    ).slice(0, 5);
-  }, [currentProduct]);
+  const [relatedProducts, setRelatedProducts] = useState<ProductSummary[]>([]);
+  useEffect(() => {
+    const fetchRelated = async () => {
+      if (!currentProduct?.category) {
+        setRelatedProducts([]);
+        return;
+      }
+      const res = await searchProducts({ category: currentProduct.category, limit: 10 });
+      const filtered = (res.data ?? []).filter((p) => p.id !== currentProduct.id).slice(0, 5);
+      setRelatedProducts(filtered);
+    };
+    fetchRelated();
+  }, [currentProduct?.category, currentProduct?.id]);
 
   const comments = [
     {
@@ -92,22 +135,22 @@ const ListingDetailsScreen = () => {
     <Image source={{ uri: item.url }} style={styles.productImage} />
   );
 
-  const renderRelatedItem = ({ item }: { item: Product }) => (
+  const renderRelatedItem = ({ item }: { item: ProductSummary }) => (
     <TouchableOpacity
       style={styles.relatedItemCard}
-      onPress={() => navigation.push('ListingDetails', { product: item })}
+      onPress={() => navigation.push('ListingDetails', { listingId: item.id })}
     >
-      <Image source={{ uri: item.image }} style={styles.relatedItemImage} />
+      <Image source={{ uri: item.images?.[0] ?? 'https://placehold.co/200x200?text=CamPulse' }} style={styles.relatedItemImage} />
       <View style={styles.relatedItemInfo}>
         <Text style={styles.relatedItemTitle} numberOfLines={2}>
           {item.title}
         </Text>
-        <Text style={styles.relatedItemPrice}>₦{item.price.toLocaleString()}</Text>
+        <Text style={styles.relatedItemPrice}>₦{(item.price ?? 0).toLocaleString()}</Text>
       </View>
     </TouchableOpacity>
   );
 
-  const renderComment = ({ item }) => (
+  const renderComment = ({ item }: { item: { id: string; user: string; rating: number; date: string; comment: string } }) => (
     <View style={styles.commentContainer}>
       <View style={styles.commentHeader}>
         <View style={styles.commentUserInfo}>
@@ -174,7 +217,27 @@ const ListingDetailsScreen = () => {
         <Text style={styles.headerTitle} numberOfLines={1}>{currentProduct.title}</Text>
         <TouchableOpacity 
           style={styles.heartButton}
-          onPress={() => setIsFavorite(!isFavorite)}
+          onPress={async () => {
+            if (!user?.id) {
+              Alert.alert('Sign in required', 'Please sign in to save favorites.');
+              return;
+            }
+            if (isFavorite) {
+              const r = await removeFavorite(user.id, currentProduct.id);
+              if (r.error) {
+                Alert.alert('Error', r.error);
+                return;
+              }
+              setIsFavorite(false);
+            } else {
+              const r = await addFavorite(user.id, currentProduct.id);
+              if (r.error) {
+                Alert.alert('Error', r.error);
+                return;
+              }
+              setIsFavorite(true);
+            }
+          }}
         >
           <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? "#FF0000" : "#1E293B"} />
         </TouchableOpacity>
@@ -241,57 +304,63 @@ const ListingDetailsScreen = () => {
             )}
 
             <View style={styles.infoContainer}>
-              <Text style={styles.price}>₦{currentProduct.price.toLocaleString()}</Text>
+              <Text style={styles.price}>₦{(currentProduct.price ?? 0).toLocaleString()}</Text>
               <Text style={styles.title}>{currentProduct.title}</Text>
               <View style={styles.conditionContainer}>
                 <Text style={styles.conditionLabel}>Condition:</Text>
-                <Text style={styles.condition}>{currentProduct.condition}</Text>
+                <Text style={styles.condition}>{String(currentProduct.condition ?? '').replace('-', ' ')}</Text>
               </View>
-              <Text style={styles.dateListed}>Listed {currentProduct.datePosted}</Text>
+              <Text style={styles.dateListed}>Listed {currentProduct.created_at ? new Date(currentProduct.created_at).toLocaleDateString() : '—'}</Text>
             </View>
 
             <View style={styles.sellerContainer}>
-              <View style={styles.sellerHeader}>
-                <View style={styles.sellerAvatar}>
-                  <Ionicons name="person" size={24} color="#6366F1" />
-                </View>
-                <View style={styles.sellerInfo}>
-                  <Text style={styles.sellerName}>John Doe</Text> 
-                  <View style={styles.sellerMeta}>
-                    <Text style={styles.sellerRating}>⭐ 4.8 (120 reviews)</Text>
-                    {currentProduct.sellerVerified && (
-                      <View style={styles.verifiedBadge}>
-                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                        <Text style={styles.verifiedText}>Verified</Text>
-                      </View>
-                    )}
-                  </View>
+            <View style={styles.sellerHeader}>
+              <View style={styles.sellerAvatar}>
+                <Ionicons name="person" size={24} color="#6366F1" />
+              </View>
+              <View style={styles.sellerInfo}>
+                <Text style={styles.sellerName}>
+                  {sellerProfile?.name ?? '—'}
+                </Text>
+                <View style={styles.sellerMeta}>
+                  {sellerLoading ? (
+                    <ActivityIndicator size="small" color="#6366F1" />
+                  ) : sellerError ? (
+                    <Text style={styles.sellerRating}>Seller info unavailable</Text>
+                  ) : (
+                    <Text style={styles.sellerRating}>
+                      ⭐ {sellerProfile?.rating ?? '—'}{typeof sellerProfile?.total_reviews === 'number' ? ` (${sellerProfile.total_reviews} reviews)` : ''}
+                    </Text>
+                  )}
                 </View>
               </View>
-              <TouchableOpacity 
-                style={styles.viewProfileButton}
-                onPress={() => navigation.navigate('Profile', { userId: '123' })} 
-              >
-                <Text style={styles.viewProfileText}>View Profile</Text>
-              </TouchableOpacity>
+            </View>
+            <TouchableOpacity 
+              style={styles.viewProfileButton}
+              onPress={() => {
+                if (currentProduct?.seller_id) {
+                  navigation.navigate('SellerProfile', { userId: currentProduct.seller_id });
+                }
+              }} 
+            >
+              <Text style={styles.viewProfileText}>View Seller</Text>
+            </TouchableOpacity>
             </View>
 
             <View style={styles.descriptionContainer}>
               <Text style={styles.sectionTitle}>Description</Text>
               <Text style={styles.description}>
-                {currentProduct.description}
+                {currentProduct.description ?? 'No description'}
               </Text>
             </View>
-       
-            /* bruhhh */
+            {/** Location **/}
             <View style={styles.locationContainer}>
               <Text style={styles.sectionTitle}>Location</Text>
               <View style={styles.locationInfo}>
                 <Ionicons name="location-outline" size={20} color="#6366F1" />
-                <Text style={styles.locationText}>Near Engineering Building, University Campus</Text>
+                <Text style={styles.locationText}>{sellerProfile?.location ?? '—'}</Text>
               </View>
             </View>
-            */
             
             {comments.length > 0 && (
               <View style={styles.commentsSection}>
@@ -327,7 +396,11 @@ const ListingDetailsScreen = () => {
       <View style={styles.actionContainer}>
         <TouchableOpacity 
           style={styles.messageButton}
-          onPress={() => navigation.navigate('Chat', { userId: '123' })}
+          onPress={() => {
+            if (currentProduct?.seller_id) {
+              navigation.navigate('Chat', { userId: currentProduct.seller_id });
+            }
+          }}
         >
           <Ionicons name="chatbubble-outline" size={20} color="#6366F1" />
           <Text style={styles.messageButtonText}>Message</Text>
@@ -743,4 +816,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ListingDetailsScreen; 
+export default ListingDetailsScreen;

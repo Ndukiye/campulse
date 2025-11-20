@@ -34,7 +34,7 @@ const AuthScreen = () => {
       // Login logic
       if (!formData.email || !formData.password) {
         console.warn('[AuthScreen] Missing email or password');
-        window.alert('Please fill in all fields');
+        Alert.alert('Validation', 'Please fill in all fields');
         return;
       }
       try {
@@ -45,30 +45,30 @@ const AuthScreen = () => {
         setIsSubmitting(false);
         if (error) {
           if (error.includes('Email not confirmed') || error.includes('email_not_confirmed')) {
-            window.alert('Please verify your email before signing in.');
+            Alert.alert('Email verification', 'Please verify your email before signing in.');
           } else if (error.includes('Invalid login credentials')) {
-            window.alert('Invalid email or password.');
+            Alert.alert('Sign in failed', 'Invalid email or password.');
           } else {
-            window.alert(error);
+            Alert.alert('Sign in failed', error);
           }
         } else {
-          window.alert('Logged in successfully');
+          Alert.alert('Success', 'Logged in successfully');
         }
       } catch (e) {
         console.error('[AuthScreen] signIn threw error', e);
         setIsSubmitting(false);
-        window.alert('Unexpected error during sign in. Please try again.');
+        Alert.alert('Unexpected error', 'Unexpected error during sign in. Please try again.');
       }
     } else {
       // Signup logic
       if (!formData.email || !formData.password || !formData.confirmPassword || !formData.name) {
         console.warn('[AuthScreen] Missing signup fields');
-        window.alert('Please fill in all fields');
+        Alert.alert('Validation', 'Please fill in all fields');
         return;
       }
       if (formData.password !== formData.confirmPassword) {
         console.warn('[AuthScreen] Passwords do not match');
-        window.alert('Passwords do not match');
+        Alert.alert('Validation', 'Passwords do not match');
         return;
       }
       try {
@@ -78,15 +78,15 @@ const AuthScreen = () => {
         console.log('[AuthScreen] signUp result', { error });
         setIsSubmitting(false);
         if (error) {
-          window.alert(error);
+          Alert.alert('Sign up failed', error);
         } else {
-          window.alert('Account created successfully! If email verification is enabled, please verify your email before signing in.');
+          Alert.alert('Success', 'Account created successfully! If email verification is enabled, please verify your email before signing in.');
           setIsLogin(true);
         }
       } catch (e) {
         console.error('[AuthScreen] signUp threw error', e);
         setIsSubmitting(false);
-        window.alert('Unexpected error during sign up. Please try again.');
+        Alert.alert('Unexpected error', 'Unexpected error during sign up. Please try again.');
       }
     }
   };

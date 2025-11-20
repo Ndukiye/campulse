@@ -99,7 +99,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await upsertProfile({
             id: u.id,
             email: u.email ?? '',
-            name: (u.user_metadata as any)?.name ?? (u.user_metadata as any)?.full_name ?? null,
+            name:
+              (u.user_metadata as any)?.name ??
+              (u.user_metadata as any)?.full_name ??
+              u.email ??
+              'New User',
           });
         }
       } catch (e) {

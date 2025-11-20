@@ -14,12 +14,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
 import { useAuth } from '../context/AuthContext';
 import type { ProfilesRow } from '../types/database';
 import { getProfileById, upsertProfile } from '../services/profileService';
 import { countProductsBySeller, getProductsBySeller, type ProductSummary } from '../services/productService';
+//
 import {
   countCompletedTransactionsByBuyer,
   countCompletedTransactionsBySeller,
@@ -79,6 +81,7 @@ const ProfileScreen = () => {
   const [sales, setSales] = useState<SaleSummary[]>([]);
   const [purchases, setPurchases] = useState<PurchaseSummary[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
+  //
 
   useEffect(() => {
     let isMounted = true;
@@ -277,7 +280,13 @@ const ProfileScreen = () => {
     const payload = {
       id: user.id,
       email: trimmedEmail,
-      name: trimToNull(editedProfile.name) ?? null,
+      name:
+        trimToNull(editedProfile.name) ??
+        profile?.name ??
+        user?.name ??
+        (user as any)?.full_name ??
+        user?.email ??
+        'User',
       phone: trimToNull(editedProfile.phone),
       location: trimToNull(editedProfile.location),
       bio: trimToNull(editedProfile.bio),
@@ -461,8 +470,8 @@ const ProfileScreen = () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>NIN Picture</Text>
               <TouchableOpacity style={styles.uploadButton}>
-                <Ionicons name="cloud-upload-outline" size={24} color="#4338CA" />
-                <Text style={styles.uploadText}>Upload NIN Picture</Text>
+              <Ionicons name="cloud-upload-outline" size={24} color="#4338CA" />
+              <Text style={styles.uploadText}>Upload NIN Picture</Text>
               </TouchableOpacity>
               <Text style={styles.uploadHint}>
                 Please upload a clear picture of your NIN card
@@ -472,10 +481,7 @@ const ProfileScreen = () => {
               style={styles.verifyButton} 
               onPress={() => {
                 setShowVerificationModal(false);
-                Alert.alert(
-                  'Success', 
-                  'Verification request submitted. We will review your application within 24 hours.'
-                );
+                Alert.alert('Success', 'Verification request submitted. We will review your application within 24 hours.');
               }}
             >
               <Text style={styles.verifyButtonText}>Submit Request</Text>
@@ -600,7 +606,7 @@ const ProfileScreen = () => {
                   return (
                 <TouchableOpacity
                   key={item.id}
-                  style={styles.listingCard}
+                  style={[styles.listingCard, listingPreview.length === 1 ? styles.singleListingCard : null]}
                   onPress={() => navigation.navigate('ListingDetails', { listingId: item.id })}
                 >
                       <Image source={{ uri: imageUrl }} style={styles.listingImage} />
@@ -702,6 +708,48 @@ const ProfileScreen = () => {
                     <Ionicons name="checkmark-circle" size={20} color="#10B981" />
                   </View>
                 )}
+                <TouchableOpacity style={styles.avatarEditButton} onPress={async () => {
+                  try {
+                    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    if (perm.status !== 'granted') {
+                      Alert.alert('Permission', 'Media library permission is required.');
+                      return;
+                    }
+                    const res = await ImagePicker.launchImageLibraryAsync({
+                      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                      quality: 0.8,
+                    });
+                    const uri = (res as any)?.assets?.[0]?.uri;
+                    if (!uri) return;
+                    if (!user?.id) {
+                      Alert.alert('Error', 'User session not found. Please sign in again.');
+                      return;
+                    }
+                    const { uploadAvatarImage } = await import('../services/storageService');
+                    const up = await uploadAvatarImage(uri, user.id);
+                    if (up.error || !up.url) {
+                      Alert.alert('Error', up.error ?? 'Failed to upload avatar');
+                      return;
+                    }
+                    const { data, error } = await upsertProfile({
+                      id: user.id,
+                      email: displayEmail ?? '',
+                      name: profile?.name ?? user?.name ?? (user as any)?.full_name ?? displayEmail ?? 'User',
+                      avatar_url: up.url,
+                    });
+                    if (error) {
+                      Alert.alert('Error', error);
+                      return;
+                    }
+                    const newProfile = data ?? (profile ? { ...profile, avatar_url: up.url } : null);
+                    if (newProfile) setProfile(newProfile);
+                    Alert.alert('Success', 'Profile photo updated.');
+                  } catch (e: any) {
+                    Alert.alert('Error', e?.message ?? 'Failed to update avatar');
+                  }
+                }}>
+                  <Ionicons name="camera" size={16} color="#4338CA" />
+                </TouchableOpacity>
               </View>
               <Text style={styles.name}>{displayName}</Text>
               <Text style={styles.email}>{displayEmail}</Text>
@@ -875,6 +923,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 2,
+  },
+  avatarEditButton: {
+    position: 'absolute',
+    right: 4,
+    top: 4,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    padding: 6,
   },
   name: {
     fontSize: 24,
@@ -1112,7 +1168,11 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     overflow: 'hidden',
-    width: '47%',
+    width: 220,
+  },
+  singleListingCard: {
+    width: '92%',
+    alignSelf: 'center',
   },
   listingImage: {
     width: '100%',

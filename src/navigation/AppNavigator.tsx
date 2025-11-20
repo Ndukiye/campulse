@@ -19,6 +19,7 @@ import AuthScreen from '../screens/AuthScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
+import SellerProfileScreen from '../screens/SellerProfileScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -146,6 +147,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="Profile" 
               component={ProfileScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="SellerProfile" 
+              component={SellerProfileScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen 

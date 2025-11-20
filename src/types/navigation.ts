@@ -22,6 +22,7 @@ export type RootStackParamList = {
   ListingDetails: { listingId?: string; product?: Product };
   CreateListing: undefined;
   Profile: { userId?: string };
+  SellerProfile: { userId: string };
   Chat: { userId: string };
   Settings: undefined;
   Messages: undefined;
@@ -39,4 +40,4 @@ export type MainTabParamList = {
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
-export type MainTabNavigationProp = BottomTabNavigationProp<MainTabParamList>; 
+export type MainTabNavigationProp = BottomTabNavigationProp<MainTabParamList>;

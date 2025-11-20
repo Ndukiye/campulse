@@ -12,12 +12,13 @@ import {
   Modal,
   ScrollView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MainTabNavigationProp, RootStackNavigationProp, Product, MainTabParamList } from '../types/navigation';
+import { MainTabNavigationProp, RootStackNavigationProp, MainTabParamList } from '../types/navigation';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { APP_CATEGORIES } from '../constants/categories';
-import { MOCK_PRODUCTS } from '../constants/products';
+import { searchProducts, type ProductSummary } from '../services/productService';
 
 type BrowseScreenProps = {
   navigation: MainTabNavigationProp & RootStackNavigationProp;
@@ -57,40 +58,35 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
   }, [route.params]);
 
   // Filter products based on search, category, and filters
-  const filteredProducts = useMemo(() => {
-    return MOCK_PRODUCTS.filter(product => {
-      // Search filter
-      const matchesSearch = searchQuery === '' || 
-        product.title.toLowerCase().includes(searchQuery.toLowerCase());
+  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<ProductSummary[]>([]);
 
-      // Category filter
-      const matchesCategory = selectedCategory === 'All' || 
-        product.category === selectedCategory;
-
-      // Price range filter
-      const matchesPrice = product.price >= filters.priceRange.min && 
-        product.price <= filters.priceRange.max;
-
-      // Seller type filter
-      const matchesSeller = filters.sellerType === 'all' || 
-        (filters.sellerType === 'verified' && product.sellerVerified) ||
-        (filters.sellerType === 'unverified' && !product.sellerVerified);
-
-      // Condition filter
-      const matchesCondition = filters.condition === 'all' || 
-        product.condition.toLowerCase() === filters.condition;
-
-      return matchesSearch && matchesCategory && matchesPrice && matchesSeller && matchesCondition;
+  const loadProducts = async () => {
+    setLoading(true);
+    const res = await searchProducts({
+      category: selectedCategory,
+      searchQuery,
+      minPrice: filters.priceRange.min,
+      maxPrice: filters.priceRange.max,
+      condition: filters.condition === 'all' ? 'all' : (filters.condition as any),
+      limit: 40,
     });
+    setProducts(res.data ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedCategory, filters]);
 
-  const renderProductItem = ({ item }: { item: Product }) => (
+  const renderProductItem = ({ item }: { item: ProductSummary }) => (
     <TouchableOpacity
       style={styles.productCard}
-      onPress={() => navigation.navigate('ListingDetails', { product: item })}
+      onPress={() => navigation.navigate('ListingDetails', { listingId: item.id })}
     >
       <Image 
-        source={{ uri: item.image }} 
+        source={{ uri: item.images?.[0] ?? 'https://placehold.co/400x500?text=CamPulse' }} 
         style={styles.productImage}
         resizeMode="cover"
       />
@@ -98,15 +94,9 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
         <Text style={styles.productTitle} numberOfLines={2}>
           {item.title}
         </Text>
-        <Text style={styles.productPrice}>₦{item.price.toLocaleString()}</Text>
+        <Text style={styles.productPrice}>₦{(item.price ?? 0).toLocaleString()}</Text>
         <View style={styles.productMeta}>
-          <Text style={styles.productCondition}>{item.condition}</Text>
-          {item.sellerVerified && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-              <Text style={styles.verifiedText}>Verified</Text>
-            </View>
-          )}
+          <Text style={styles.productCondition}>{String(item.condition ?? '').replace('-', ' ')}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -311,8 +301,13 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
       </View>
 
       {/* Product Grid */}
+      {loading ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator size="large" color="#6366F1" />
+        </View>
+      ) : (
       <FlatList
-        data={filteredProducts}
+        data={products}
         renderItem={renderProductItem}
         keyExtractor={(item) => item.id}
         numColumns={2}
@@ -325,6 +320,7 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
           </View>
         }
       />
+      )}
 
       {renderFilterModal()}
     </SafeAreaView>
@@ -660,4 +656,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BrowseScreen; 
+export default BrowseScreen;

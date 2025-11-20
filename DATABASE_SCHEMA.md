@@ -78,7 +78,7 @@ CREATE TABLE products (
   title TEXT NOT NULL,
   description TEXT NOT NULL,
   price DECIMAL(10,2) NOT NULL,
-  category_id UUID REFERENCES categories(id) NOT NULL,
+  category TEXT NOT NULL,
   condition TEXT NOT NULL CHECK (condition IN ('new', 'like-new', 'good', 'fair', 'poor')),
   images TEXT[] DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -107,7 +107,7 @@ CREATE POLICY "Users can delete own products"
 
 -- Indexes
 CREATE INDEX idx_products_seller ON products(seller_id);
-CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_products_category ON products(category);
 CREATE INDEX idx_products_created ON products(created_at DESC);
 ```
 
