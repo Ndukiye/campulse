@@ -56,18 +56,20 @@ export function isRemoteUrl(u?: string | null) {
 
 export async function ensureRemoteImageUrls(uris: string[], sellerId: string) {
   const out: string[] = []
+  let hadError = false
   for (const u of uris) {
     if (isRemoteUrl(u)) {
       out.push(u)
     } else {
       const up = await uploadProductImage(u, sellerId)
       if (up.error) {
-        return { urls: [], error: up.error }
+        hadError = true
+        continue
       }
       if (up.url) out.push(up.url)
     }
   }
-  return { urls: out, error: null }
+  return { urls: out, error: hadError ? 'Some images failed to upload' : null }
 }
 
 export async function uploadAvatarImage(uri: string, userId: string) {

@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackNavigationProp, RootStackParamList } from '../types/navigation';
 import { getProductById, searchProducts, type ProductSummary } from '../services/productService';
+import { addToCart } from '../services/cartService';
 import type { ProfilesRow } from '../types/database';
 import { getProfileById } from '../services/profileService';
 import { useAuth } from '../context/AuthContext';
@@ -313,6 +314,10 @@ const ListingDetailsScreen = () => {
                 <Text style={styles.condition}>{String(currentProduct.condition ?? '').replace('-', ' ')}</Text>
               </View>
               <Text style={styles.dateListed}>Listed {currentProduct.created_at ? new Date(currentProduct.created_at).toLocaleDateString() : '—'}</Text>
+              <View style={styles.stockContainer}>
+                <Ionicons name="cube-outline" size={16} color="#6366F1" />
+                <Text style={styles.stockText}>In Stock: {currentProduct.available_quantity ?? '—'}</Text>
+              </View>
             </View>
 
             <View style={styles.sellerContainer}>
@@ -408,10 +413,16 @@ const ListingDetailsScreen = () => {
           <Text style={styles.messageButtonText}>Message</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={styles.buyButton}
-          onPress={() => console.log('Buy Now pressed for product:', currentProduct.id)}
+          style={styles.messageButton}
+          onPress={async () => {
+            if (!user?.id || !currentProduct?.id) { Alert.alert('Sign in required', 'Sign in to add to cart'); return }
+            const r = await addToCart(user.id, currentProduct.id, 1)
+            if (r.error) Alert.alert('Cart', r.error)
+            else Alert.alert('Cart', 'Added to cart')
+          }}
         >
-          <Text style={styles.buyButtonText}>Buy Now</Text>
+          <Ionicons name="cart-outline" size={20} color="#6366F1" />
+          <Text style={styles.messageButtonText}>Add to Cart</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -535,6 +546,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+  },
+  stockContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  stockText: {
+    fontSize: 14,
+    color: '#334155',
+    fontWeight: '500',
   },
   price: {
     fontSize: 26,
@@ -787,6 +809,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
     backgroundColor: '#fff',
+    justifyContent: 'space-evenly',
   },
   messageButton: {
     flex: 1,
@@ -803,19 +826,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#6366F1',
-  },
-  buyButton: {
-    flex: 1.5,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buyButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
   },
 });
 

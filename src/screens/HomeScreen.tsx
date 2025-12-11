@@ -122,6 +122,12 @@ const HomeScreen = () => {
           >
             <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIcon}
+            onPress={() => navigation.navigate('Cart')}
+          >
+            <Ionicons name="cart-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
         </View>
       </View>
 

@@ -22,6 +22,8 @@ import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
 import SellerProfileScreen from '../screens/SellerProfileScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
+import CartScreen from '../screens/CartScreen';
+import CheckoutScreen from '../screens/CheckoutScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -188,6 +190,16 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="AdminDashboard" 
               component={AdminDashboardScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Cart" 
+              component={CartScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Checkout" 
+              component={CheckoutScreen}
               options={{ headerShown: false }}
             />
           </>

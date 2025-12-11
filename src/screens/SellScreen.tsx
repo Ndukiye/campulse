@@ -57,6 +57,7 @@ const SellScreen = () => {
   const [images, setImages] = useState<string[]>([]);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showConditionPicker, setShowConditionPicker] = useState(false);
+  const [availableQuantity, setAvailableQuantity] = useState('1');
 
   const [listings, setListings] = useState<ProductSummary[]>([]);
   const [loadingListings, setLoadingListings] = useState(true);
@@ -159,6 +160,7 @@ const SellScreen = () => {
     setTitle('');
     setDescription('');
     setPrice('');
+    setAvailableQuantity('1');
     setCondition(CONDITION_OPTIONS[0]?.value ?? 'new');
     setImages([]);
     setSelectedCategory(APP_CATEGORIES[0]?.name ?? '');
@@ -187,13 +189,17 @@ const SellScreen = () => {
       return;
     }
 
+    const parsedQty = Number(availableQuantity);
+    if (Number.isNaN(parsedQty) || parsedQty <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid quantity (at least 1).');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const ensured = await ensureRemoteImageUrls(images, user.id);
       if (ensured.error) {
         Alert.alert('Image Upload Error', ensured.error);
-        setIsSubmitting(false);
-        return;
       }
       const payload: ProductsInsert = {
         seller_id: user.id,
@@ -202,6 +208,7 @@ const SellScreen = () => {
         price: parsedPrice,
         category: selectedCategory,
         condition: condition as ProductsInsert['condition'],
+        available_quantity: parsedQty,
         images: ensured.urls,
       };
 
@@ -232,6 +239,7 @@ const SellScreen = () => {
     setTitle(item.title ?? '');
     setDescription(item.description ?? '');
     setPrice(item.price !== null && item.price !== undefined ? String(item.price) : '');
+    setAvailableQuantity(item.available_quantity !== null && item.available_quantity !== undefined ? String(item.available_quantity) : '1');
     setSelectedCategory(item.category ?? APP_CATEGORIES[0]?.name ?? '');
     setCondition((item.condition as string) ?? CONDITION_OPTIONS[0]?.value ?? 'new');
     setImages(item.images ?? []);
@@ -265,8 +273,6 @@ const SellScreen = () => {
       const ensured = await ensureRemoteImageUrls(images, user.id);
       if (ensured.error) {
         Alert.alert('Image Upload Error', ensured.error);
-        setIsSubmitting(false);
-        return;
       }
       const result = await updateProduct(
         {
@@ -276,6 +282,7 @@ const SellScreen = () => {
           price: parsedPrice,
           category: selectedCategory,
           condition: condition as any,
+          available_quantity: Math.max(0, Number(availableQuantity)),
           images: ensured.urls,
         },
         user.id
@@ -512,6 +519,18 @@ const SellScreen = () => {
             </View>
 
             <View style={styles.inputGroup}>
+              <Text style={styles.label}>Available Quantity*</Text>
+              <TextInput
+                style={styles.input}
+                value={availableQuantity}
+                onChangeText={setAvailableQuantity}
+                placeholder="Number of items in stock"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>Category*</Text>
               <TouchableOpacity
                 style={styles.pickerButton}
@@ -614,6 +633,12 @@ const SellScreen = () => {
             onPress={() => navigation.navigate('Messages')}
           >
             <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIcon}
+            onPress={() => navigation.navigate('Cart')}
+          >
+            <Ionicons name="cart-outline" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>

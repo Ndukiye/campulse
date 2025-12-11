@@ -36,6 +36,7 @@ export interface ProductsRow {
   price: number;
   category: string;
   condition: 'new' | 'like-new' | 'good' | 'fair' | 'poor';
+  available_quantity?: number | null;
   images: string[] | null;
   created_at?: string | null;
   updated_at?: string | null;

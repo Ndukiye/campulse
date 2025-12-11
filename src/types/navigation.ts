@@ -20,6 +20,8 @@ export type RootStackParamList = {
     params?: any;
   };
   ListingDetails: { listingId?: string; product?: Product };
+  Cart: undefined;
+  Checkout: { productId?: string };
   CreateListing: undefined;
   Profile: { userId?: string };
   SellerProfile: { userId: string };
