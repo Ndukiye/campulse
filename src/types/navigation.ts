@@ -29,6 +29,7 @@ export type RootStackParamList = {
   Notifications: undefined;
   PrivacySecurity: undefined;
   HelpSupport: undefined;
+  AdminDashboard: undefined;
 };
 
 export type MainTabParamList = {

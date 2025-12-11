@@ -19,6 +19,7 @@ import { MainTabNavigationProp, RootStackNavigationProp, MainTabParamList } from
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { APP_CATEGORIES } from '../constants/categories';
 import { searchProducts, type ProductSummary } from '../services/productService';
+import { useThemeMode } from '../context/ThemeContext';
 
 type BrowseScreenProps = {
   navigation: MainTabNavigationProp & RootStackNavigationProp;
@@ -38,6 +39,7 @@ const browseScreenCategories = ['All', ...APP_CATEGORIES.map(cat => cat.name)];
 
 const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
   const route = useRoute<RouteProp<MainTabParamList, 'Browse'>>();
+  const { colors } = useThemeMode();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
@@ -60,25 +62,56 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
   // Filter products based on search, category, and filters
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<ProductSummary[]>([]);
+  const [sortBy, setSortBy] = useState<'newest' | 'price_asc' | 'price_desc'>('newest');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 24;
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const loadProducts = async () => {
     setLoading(true);
+    setPage(0);
     const res = await searchProducts({
       category: selectedCategory,
       searchQuery,
       minPrice: filters.priceRange.min,
       maxPrice: filters.priceRange.max,
       condition: filters.condition === 'all' ? 'all' : (filters.condition as any),
-      limit: 40,
+      sortBy,
+      page: 0,
+      pageSize: PAGE_SIZE,
     });
-    setProducts(res.data ?? []);
+    const rows = res.data ?? [];
+    setProducts(rows);
+    setHasMore(rows.length === PAGE_SIZE);
     setLoading(false);
+  };
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    const res = await searchProducts({
+      category: selectedCategory,
+      searchQuery,
+      minPrice: filters.priceRange.min,
+      maxPrice: filters.priceRange.max,
+      condition: filters.condition === 'all' ? 'all' : (filters.condition as any),
+      sortBy,
+      page: nextPage,
+      pageSize: PAGE_SIZE,
+    });
+    const rows = res.data ?? [];
+    setProducts((prev) => prev.concat(rows));
+    setPage(nextPage);
+    setHasMore(rows.length === PAGE_SIZE);
+    setLoadingMore(false);
   };
 
   useEffect(() => {
     loadProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, selectedCategory, filters]);
+  }, [searchQuery, selectedCategory, filters, sortBy]);
 
   const renderProductItem = ({ item }: { item: ProductSummary }) => (
     <TouchableOpacity
@@ -91,12 +124,12 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
         resizeMode="cover"
       />
       <View style={styles.productInfo}>
-        <Text style={styles.productTitle} numberOfLines={2}>
+        <Text style={[styles.productTitle, { color: colors.text }]} numberOfLines={2}>
           {item.title}
         </Text>
-        <Text style={styles.productPrice}>₦{(item.price ?? 0).toLocaleString()}</Text>
+        <Text style={[styles.productPrice, { color: colors.primary }]}>₦{(item.price ?? 0).toLocaleString()}</Text>
         <View style={styles.productMeta}>
-          <Text style={styles.productCondition}>{String(item.condition ?? '').replace('-', ' ')}</Text>
+          <Text style={[styles.productCondition, { color: colors.muted }]}>{String(item.condition ?? '').replace('-', ' ')}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -204,6 +237,36 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
                   ))}
                 </View>
               </View>
+
+              {/* Sort By */}
+              <View style={styles.filterGroup}>
+                <Text style={styles.filterGroupTitle}>Sort By</Text>
+                <View style={styles.filterOptions}>
+                  {[
+                    { key: 'newest', label: 'Newest' },
+                    { key: 'price_asc', label: 'Price Low to High' },
+                    { key: 'price_desc', label: 'Price High to Low' },
+                  ].map((opt) => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.filterOption,
+                        sortBy === (opt.key as any) && styles.filterOptionActive,
+                      ]}
+                      onPress={() => setSortBy(opt.key as any)}
+                    >
+                      <Text
+                        style={[
+                          styles.filterOptionText,
+                          sortBy === (opt.key as any) && styles.filterOptionTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </ScrollView>
 
             <View style={styles.filterActions}>
@@ -231,35 +294,35 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }] }>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Browse</Text>
+          <Text style={[styles.headerTitle, { color: colors.primary }]}>Browse</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 
             style={styles.headerButton}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <Ionicons name="notifications-outline" size={24} color="#1E293B" />
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerIcon}
             onPress={() => navigation.navigate('Messages')}
           >
-            <Ionicons name="chatbubble-outline" size={22} color="#1E293B" />
+            <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Search and Filters */}
-      <View style={styles.searchFilterContainer}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={18} color="#6366F1" style={styles.searchIcon} />
+      <View style={[styles.searchFilterContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }] }>
+        <View style={[styles.searchContainer, { backgroundColor: colors.background }] }>
+          <Ionicons name="search" size={18} color={colors.primary} style={styles.searchIcon} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search listings..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={colors.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
@@ -272,7 +335,7 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
       </View>
 
       {/* Category Selector */}
-      <View style={styles.categoriesWrapper}>
+      <View style={[styles.categoriesWrapper, { backgroundColor: colors.card }] }>
         <FlatList
           horizontal
           data={browseScreenCategories}
@@ -300,6 +363,8 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
         />
       </View>
 
+      
+
       {/* Product Grid */}
       {loading ? (
         <View style={styles.emptyState}>
@@ -312,6 +377,15 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
         keyExtractor={(item) => item.id}
         numColumns={2}
         contentContainerStyle={styles.productList}
+        onEndReachedThreshold={0.5}
+        onEndReached={loadMore}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={{ paddingVertical: 16 }}>
+              <ActivityIndicator size="small" color="#6366F1" />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="search-outline" size={48} color="#94A3B8" />

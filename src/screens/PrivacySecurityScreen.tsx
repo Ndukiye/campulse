@@ -12,9 +12,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeContext';
 
 const PrivacySecurityScreen = () => {
   const navigation = useNavigation();
+  const { colors } = useThemeMode();
   const { signOut } = useAuth();
   const [settings, setSettings] = useState({
     profileVisibility: true,
@@ -88,21 +90,21 @@ const PrivacySecurityScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Privacy & Security</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Privacy & Security</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacy Settings</Text>
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Privacy Settings</Text>
           {renderSettingItem(
             'Profile Visibility',
             'Make your profile visible to other users',
@@ -123,8 +125,8 @@ const PrivacySecurityScreen = () => {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Notifications</Text>
           {renderSettingItem(
             'Email Notifications',
             'Receive updates via email',
@@ -139,8 +141,8 @@ const PrivacySecurityScreen = () => {
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Security</Text>
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Security</Text>
           {renderSettingItem(
             'Two-Factor Authentication',
             'Add an extra layer of security',
@@ -157,8 +159,8 @@ const PrivacySecurityScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.section, styles.accountSection]}>
-          <Text style={styles.sectionTitle}>Account</Text>
+        <View style={[styles.section, styles.accountSection, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
             onPress={handleDeleteAccount}

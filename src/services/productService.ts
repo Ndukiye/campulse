@@ -52,6 +52,49 @@ export async function getProductsBySeller(sellerId: string, limit = 12) {
   };
 }
 
+export type SellerProductsFilters = {
+  sellerId: string;
+  searchQuery?: string;
+  page?: number;
+  pageSize?: number;
+  sortBy?: 'newest' | 'price_asc' | 'price_desc';
+};
+
+export async function searchSellerProducts(filters: SellerProductsFilters) {
+  const { sellerId, searchQuery, page = 0, pageSize = 24, sortBy = 'newest' } = filters;
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
+    .from('products')
+    .select('id,seller_id,title,description,price,images,created_at,condition,category')
+    .eq('seller_id', sellerId)
+    .order(
+      sortBy === 'price_asc' ? 'price' : sortBy === 'price_desc' ? 'price' : 'created_at',
+      { ascending: sortBy === 'price_asc' ? true : sortBy === 'newest' ? false : false }
+    )
+    .range(from, to);
+
+  if (searchQuery && searchQuery.trim().length > 0) {
+    query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+  }
+
+  const { data, error } = await query;
+  const mapped: ProductSummary[] =
+    data?.map((row: any) => ({
+      id: row.id,
+      seller_id: row.seller_id ?? undefined,
+      title: row.title,
+      description: row.description ?? null,
+      price: row.price !== null && row.price !== undefined ? Number(row.price) : null,
+      images: (row.images as string[] | null) ?? null,
+      created_at: row.created_at ?? null,
+      condition: (row.condition ?? null) as ProductsRow['condition'] | null,
+      category: row.category ?? null,
+    })) ?? [];
+  return { data: mapped, error: error ? error.message : null };
+}
+
 export async function getProductById(id: string) {
   const { data, error } = await supabase
     .from('products')
@@ -85,6 +128,9 @@ export type ProductSearchFilters = {
   maxPrice?: number;
   condition?: ProductsRow['condition'] | 'all';
   limit?: number;
+  sortBy?: 'newest' | 'price_asc' | 'price_desc';
+  page?: number;
+  pageSize?: number;
 };
 
 export async function searchProducts(filters: ProductSearchFilters) {
@@ -95,13 +141,23 @@ export async function searchProducts(filters: ProductSearchFilters) {
     maxPrice,
     condition = 'all',
     limit = 24,
+    sortBy = 'newest',
+    page = 0,
+    pageSize,
   } = filters;
+
+  const effectiveLimit = pageSize ?? limit;
+  const from = page * effectiveLimit;
+  const to = from + effectiveLimit - 1;
 
   let query = supabase
     .from('products')
     .select('id,seller_id,title,description,price,images,created_at,condition,category')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .order(
+      sortBy === 'price_asc' ? 'price' : sortBy === 'price_desc' ? 'price' : 'created_at',
+      { ascending: sortBy === 'price_asc' ? true : sortBy === 'newest' ? false : false }
+    )
+    .range(from, to);
 
   if (category && category !== 'All') {
     query = query.eq('category', category);

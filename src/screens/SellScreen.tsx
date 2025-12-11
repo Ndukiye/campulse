@@ -25,12 +25,14 @@ import {
   createProduct,
   deleteProduct,
   updateProduct,
+  searchSellerProducts,
   type ProductSummary,
 } from '../services/productService';
 import { RootStackNavigationProp } from '../types/navigation';
 import type { ProductsInsert } from '../types/database';
 import { APP_CATEGORIES } from '../constants/categories';
 import { ensureRemoteImageUrls } from '../services/storageService';
+import { useThemeMode } from '../context/ThemeContext';
 
 const CONDITION_OPTIONS = [
   { label: 'New', value: 'new' },
@@ -43,6 +45,7 @@ const CONDITION_OPTIONS = [
 const SellScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
   const { user } = useAuth();
+  const { colors } = useThemeMode();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingItem, setEditingItem] = useState<ProductSummary | null>(null);
@@ -60,28 +63,45 @@ const SellScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [mySearchQuery, setMySearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 24;
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const loadListings = useCallback(
     async (showLoading = true) => {
       if (!user?.id) return;
-      if (showLoading) {
-        setLoadingListings(true);
-      }
-      const res = await getProductsBySeller(user.id, 40);
+      if (showLoading) setLoadingListings(true);
+      setPage(0);
+      const res = await searchSellerProducts({
+        sellerId: user.id,
+        searchQuery: mySearchQuery,
+        page: 0,
+        pageSize: PAGE_SIZE,
+        sortBy: 'newest',
+      });
       if (res.error) {
         console.warn('[SellScreen] Failed to load listings:', res.error);
       }
-      setListings(res.data ?? []);
-      if (showLoading) {
-        setLoadingListings(false);
-      }
+      const rows = res.data ?? [];
+      setListings(rows);
+      setHasMore(rows.length === PAGE_SIZE);
+      if (showLoading) setLoadingListings(false);
     },
-    [user?.id]
+    [user?.id, mySearchQuery]
   );
 
   useEffect(() => {
     loadListings(true);
   }, [loadListings]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      loadListings(true);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [mySearchQuery]);
 
   const onRefresh = useCallback(async () => {
     if (!user?.id) return;
@@ -89,6 +109,24 @@ const SellScreen = () => {
     await loadListings(false);
     setRefreshing(false);
   }, [loadListings, user?.id]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !user?.id) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    const res = await searchSellerProducts({
+      sellerId: user.id,
+      searchQuery: mySearchQuery,
+      page: nextPage,
+      pageSize: PAGE_SIZE,
+      sortBy: 'newest',
+    });
+    const rows = res.data ?? [];
+    setListings((prev) => prev.concat(rows));
+    setPage(nextPage);
+    setHasMore(rows.length === PAGE_SIZE);
+    setLoadingMore(false);
+  }, [loadingMore, hasMore, page, user?.id, mySearchQuery]);
 
   const pickImage = useCallback(async () => {
     try {
@@ -307,22 +345,22 @@ const SellScreen = () => {
       const priceValue = item.price ?? 0;
 
       return (
-        <View style={styles.listingCard}>
+        <View style={[styles.listingCard, { backgroundColor: colors.card }]}>
           <Image
             source={{ uri: imageUrl }}
             style={styles.listingImage}
             resizeMode="cover"
           />
           <View style={styles.listingContent}>
-            <Text style={styles.listingTitle} numberOfLines={2}>
+            <Text style={[styles.listingTitle, { color: colors.text }]} numberOfLines={2}>
               {item.title}
             </Text>
             <Text style={styles.listingPrice}>
               ₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </Text>
-            <Text style={styles.listingCategory}>{item.category ?? 'Uncategorized'}</Text>
-            <Text style={styles.listingCondition}>Condition: {conditionLabel}</Text>
-            <Text style={styles.listingDate}>Posted: {createdDate}</Text>
+            <Text style={[styles.listingCategory, { color: colors.muted }]}>{item.category ?? 'Uncategorized'}</Text>
+            <Text style={[styles.listingCondition, { color: colors.muted }]}>Condition: {conditionLabel}</Text>
+            <Text style={[styles.listingDate, { color: colors.muted }]}>Posted: {createdDate}</Text>
             <View style={styles.listingActions}>
               <TouchableOpacity
                 style={[styles.actionButton, styles.editButton]}
@@ -559,24 +597,39 @@ const SellScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: '#E2E8F0' }] }>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>My Listings</Text>
+          <Text style={[styles.headerTitle, { color: colors.primary }]}>My Listings</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 
             style={styles.headerButton}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <Ionicons name="notifications-outline" size={24} color="#1E293B" />
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerIcon}
             onPress={() => navigation.navigate('Messages')}
           >
-            <Ionicons name="chatbubble-outline" size={22} color="#1E293B" />
+            <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
           </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Search for my listings */}
+      <View style={[styles.searchRow, { backgroundColor: colors.card, borderBottomColor: '#E2E8F0' }] }>
+        <View style={[styles.searchContainer, { backgroundColor: colors.background }] }>
+          <Ionicons name="search" size={18} color={colors.primary} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search my listings..."
+            placeholderTextColor={colors.muted}
+            value={mySearchQuery}
+            onChangeText={setMySearchQuery}
+            returnKeyType="search"
+          />
         </View>
       </View>
 
@@ -597,6 +650,15 @@ const SellScreen = () => {
           keyExtractor={(item) => item.id}
           numColumns={2}
           contentContainerStyle={styles.listingsContainer}
+          onEndReachedThreshold={0.5}
+          onEndReached={loadMore}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={{ paddingVertical: 16 }}>
+                <ActivityIndicator size="small" color="#6366F1" />
+              </View>
+            ) : null
+          }
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4338CA" />
           }
@@ -650,6 +712,27 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     padding: 4,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 40,
+    marginRight: 8,
+  },
+  searchIcon: { marginRight: 6 },
+  searchInput: { flex: 1, height: 40, fontSize: 15, color: '#1E293B' },
   emptyState: {
     flex: 1,
     justifyContent: 'center',

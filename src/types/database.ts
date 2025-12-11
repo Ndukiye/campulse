@@ -12,6 +12,7 @@ export interface ProfilesRow {
   nin_document_url?: string | null;
   verification_status?: VerificationStatus | null;
   verified?: boolean | null;
+  is_admin?: boolean | null;
   rating?: number | null; // decimal(3,2)
   total_reviews?: number | null;
   created_at?: string | null;
@@ -42,3 +43,14 @@ export interface ProductsRow {
 
 export type ProductsInsert = Omit<ProductsRow, 'id' | 'created_at' | 'updated_at'>;
 export type ProductsUpdate = Partial<ProductsRow> & { id: string };
+
+export interface NotificationsRow {
+  id: string
+  user_id: string
+  type: 'message' | 'favorite' | 'review' | 'product_sold' | 'system'
+  title: string
+  body: string
+  data?: any
+  read: boolean
+  created_at?: string | null
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,17 +10,22 @@ import {
   SafeAreaView,
   FlatList,
   ActivityIndicator,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
 import { APP_CATEGORIES, AppCategory } from '../constants/categories';
 import { searchProducts, type ProductSummary } from '../services/productService';
+import { useThemeMode } from '../context/ThemeContext';
 
 const SECTION_LIMIT = 10;
 
 const HomeScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const { colors, isDark } = useThemeMode();
+  const bannerAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [featured, setFeatured] = useState<ProductSummary[]>([]);
@@ -40,6 +45,27 @@ const HomeScreen = () => {
     load();
   }, []);
 
+  useEffect(() => {
+    const w = Dimensions.get('window').width;
+    bannerAnim.setValue(w);
+    let mounted = true;
+    const loop = () => {
+      if (!mounted) return;
+      Animated.timing(bannerAnim, {
+        toValue: -w,
+        duration: 16000,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && mounted) {
+          bannerAnim.setValue(w);
+          loop();
+        }
+      });
+    };
+    loop();
+    return () => { mounted = false; };
+  }, [bannerAnim]);
+
   const handleSearch = () => {
     if (searchQuery.trim()) {
       navigation.navigate('Main', { screen: 'Browse', params: { searchQuery: searchQuery.trim() } });
@@ -52,8 +78,8 @@ const HomeScreen = () => {
       style={styles.categoryItem}
       onPress={() => navigation.navigate('Main', { screen: 'Browse', params: { category: category.name } })}
     >
-      <Ionicons name={category.icon} size={24} color="#6366F1" />
-      <Text style={styles.categoryText}>{category.name}</Text>
+      <Ionicons name={category.icon} size={24} color={colors.primary} />
+      <Text style={[styles.categoryText, { color: colors.text }]}>{category.name}</Text>
     </TouchableOpacity>
   );
 
@@ -65,47 +91,56 @@ const HomeScreen = () => {
     >
       <Image source={{ uri: listing.images?.[0] ?? 'https://placehold.co/200x200?text=CamPulse' }} style={styles.productImage} />
       <View style={styles.featuredInfo}>
-        <Text style={styles.featuredTitle} numberOfLines={2}>
+        <Text style={[styles.featuredTitle, { color: colors.text }]} numberOfLines={2}>
           {listing.title}
         </Text>
         <Text style={styles.featuredPrice}>₦{(listing.price ?? 0).toLocaleString()}</Text>
         <View style={styles.featuredMeta}>
-          <Text style={styles.featuredCondition}>{String(listing.condition ?? '').replace('-', ' ')}</Text>
+          <Text style={[styles.featuredCondition, { color: colors.muted }]}>{String(listing.condition ?? '').replace('-', ' ')}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>CamPulse</Text>
+          <Text style={[styles.headerTitle, { color: colors.primary }]}>CamPulse</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 
             style={styles.headerButton}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <Ionicons name="notifications-outline" size={24} color="#1E293B" />
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerIcon}
             onPress={() => navigation.navigate('Messages')}
           >
-            <Ionicons name="chatbubble-outline" size={22} color="#1E293B" />
+            <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
 
+      <View style={[styles.riskBannerContainer, { backgroundColor: colors.card }]}> 
+        <Animated.View style={{ transform: [{ translateX: bannerAnim }] }}>
+          <View style={styles.riskBannerContent}>
+            <Ionicons name="alert-circle-outline" size={14} color={colors.muted} />
+            <Text style={[styles.riskText, { color: colors.muted }]}>Payments outside the app are at your own risk.</Text>
+          </View>
+        </Animated.View>
+      </View>
+
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#6366F1" style={styles.searchIcon} />
+      <View style={[styles.searchContainer, { backgroundColor: colors.card }] }>
+        <Ionicons name="search" size={20} color={colors.primary} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.text } ]}
           placeholder="Search for textbooks, furniture, electronics..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={colors.muted}
           value={searchQuery}
           onChangeText={setSearchQuery}
           onSubmitEditing={handleSearch}
@@ -122,26 +157,26 @@ const HomeScreen = () => {
           data={[1]}
           renderItem={() => (
             <>
-              <View style={styles.categoriesContainer}>
-                <Text style={styles.sectionTitle}>Categories</Text>
+              <View style={[styles.categoriesContainer, { backgroundColor: colors.card }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Categories</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {APP_CATEGORIES.map(renderCategoryItem)}
                 </ScrollView>
               </View>
-              <View style={styles.featuredContainer}>
-                <Text style={styles.sectionTitle}>Featured Listings</Text>
+              <View style={[styles.featuredContainer, { backgroundColor: colors.card }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Featured Listings</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {featured.map(renderFeaturedListing)}
                 </ScrollView>
               </View>
-              <View style={styles.justInContainer}>
-                <Text style={styles.sectionTitle}>Just In</Text>
+              <View style={[styles.justInContainer, { backgroundColor: colors.card }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Just In</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {justIn.map(renderFeaturedListing)}
                 </ScrollView>
               </View>
-              <View style={styles.popularContainer}>
-                <Text style={styles.sectionTitle}>Popular Near You</Text>
+              <View style={[styles.popularContainer, { backgroundColor: colors.card }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Popular Near You</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {popular.map(renderFeaturedListing)}
                 </ScrollView>
@@ -215,6 +250,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: '#1E293B',
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginLeft: 16,
+    marginRight: 16,
+    marginBottom: 12,
+  },
+  sectionAction: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
   categoryItem: {
     alignItems: 'center',
     marginHorizontal: 10,
@@ -260,6 +307,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 240,
     backgroundColor: '#F1F5F9',
+    resizeMode: 'cover',
   },
   featuredInfo: {
     padding: 12,
@@ -334,6 +382,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
+  },
+  riskBannerContainer: {
+    height: 24,
+    overflow: 'hidden',
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 6,
+  },
+  riskBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  riskText: {
+    fontSize: 12,
   },
   header: {
     flexDirection: 'row',

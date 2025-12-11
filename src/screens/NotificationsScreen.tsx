@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,69 +12,96 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useThemeMode } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead, subscribeToUserNotifications, type NotificationRow } from '../services/notificationService';
 import { RootStackNavigationProp } from '../types/navigation';
 
 type Notification = {
   id: string;
-  type: 'message' | 'offer' | 'price' | 'security';
+  type: string;
   title: string;
   message: string;
   time: string;
   read: boolean;
-  date: string; // Added for grouping
+  date: string;
 };
 
 const NotificationsScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const { colors } = useThemeMode();
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'message',
-      title: 'New Message',
-      message: 'John Doe sent you a message about your listing',
-      time: '2m ago',
-      read: false,
-      date: 'Today',
-    },
-    {
-      id: '2',
-      type: 'offer',
-      title: 'New Offer',
-      message: 'You received a new offer for your camera',
-      time: '1h ago',
-      read: false,
-      date: 'Today',
-    },
-    {
-      id: '3',
-      type: 'price',
-      title: 'Price Alert',
-      message: 'The price of Canon EOS R5 has dropped by 15%',
-      time: '3h ago',
-      read: true,
-      date: 'Today',
-    },
-    {
-      id: '4',
-      type: 'security',
-      title: 'Security Alert',
-      message: 'New login detected from a new device',
-      time: '1d ago',
-      read: true,
-      date: 'Yesterday',
-    },
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const formatRelativeTime = (iso: string) => {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = Math.max(0, now.getTime() - d.getTime());
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  const dateLabel = (iso: string) => {
+    const d = new Date(iso);
+    const today = new Date();
+    const yday = new Date();
+    yday.setDate(today.getDate() - 1);
+    const isSameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    if (isSameDay(d, today)) return 'Today';
+    if (isSameDay(d, yday)) return 'Yesterday';
+    return d.toLocaleDateString();
+  };
+
+  const mapRow = (row: NotificationRow): Notification => ({
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    message: row.body,
+    time: formatRelativeTime(row.created_at),
+    read: !!row.read,
+    date: dateLabel(row.created_at),
+  });
+
+  useEffect(() => {
+    let unsub: (() => void) | null = null;
+    const init = async () => {
+      if (!user?.id) {
+        setNotifications([]);
+        return;
+      }
+      setLoading(true);
+      const res = await fetchNotifications(user.id, 50);
+      const rows = res.data ?? [];
+      setNotifications(rows.map(mapRow));
+      setLoading(false);
+      unsub = subscribeToUserNotifications(user.id, (row) => {
+        setNotifications((prev) => [mapRow(row), ...prev]);
+      });
+    };
+    init();
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [user?.id]);
 
   const getNotificationIcon = (type: Notification['type']) => {
     switch (type) {
       case 'message':
         return 'chatbubble-outline';
-      case 'offer':
-        return 'pricetag-outline';
-      case 'price':
-        return 'trending-up-outline';
-      case 'security':
+      case 'favorite':
+        return 'heart-outline';
+      case 'review':
+        return 'star-outline';
+      case 'product_sold':
+        return 'cube-outline';
+      case 'system':
         return 'shield-checkmark-outline';
       default:
         return 'notifications-outline';
@@ -85,37 +112,39 @@ const NotificationsScreen = () => {
     switch (type) {
       case 'message':
         return '#4338CA';
-      case 'offer':
-        return '#059669';
-      case 'price':
-        return '#F59E0B';
-      case 'security':
+      case 'favorite':
         return '#DC2626';
+      case 'review':
+        return '#F59E0B';
+      case 'product_sold':
+        return '#059669';
+      case 'system':
+        return '#64748B';
       default:
         return '#64748B';
     }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications(notifications.map(notification =>
-      notification.id === id ? { ...notification, read: true } : notification
-    ));
+  const markAsRead = async (id: string) => {
+    await markNotificationRead(id);
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(notification => ({
-      ...notification,
-      read: true,
-    })));
+  const markAllAsRead = async () => {
+    if (!user?.id) return;
+    await markAllNotificationsRead(user.id);
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
   const onRefresh = useCallback(() => {
+    if (!user?.id) return;
     setRefreshing(true);
-    // Simulate API call
-    setTimeout(() => {
+    fetchNotifications(user.id, 50).then((res) => {
+      const rows = res.data ?? [];
+      setNotifications(rows.map(mapRow));
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    });
+  }, [user?.id]);
 
   const renderSectionHeader = (date: string) => (
     <View style={styles.sectionHeader}>
@@ -167,19 +196,23 @@ const NotificationsScreen = () => {
   }));
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Notifications</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
         </View>
         {notifications.some(n => !n.read) && (
-          <TouchableOpacity onPress={markAllAsRead} style={styles.markAllButton}>
-            <Text style={styles.markAllText}>Mark all as read</Text>
+          <TouchableOpacity onPress={markAllAsRead} style={[styles.markAllButton, { backgroundColor: colors.background }]}>
+            <Text style={[styles.markAllText, { color: colors.primary }]}>Mark all as read</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {notifications.length === 0 ? (
+      {loading ? (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color="#4338CA" />
+        </View>
+      ) : notifications.length === 0 ? (
         renderEmptyState()
       ) : (
         <FlatList
@@ -206,7 +239,7 @@ const NotificationsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+  const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -318,6 +351,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
   },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
   emptyStateText: {
     fontSize: 18,
     fontWeight: '600',
@@ -332,4 +371,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default NotificationsScreen; 
+export default NotificationsScreen;

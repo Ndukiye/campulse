@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginTop: 8 },
   emptyStateSubtitle: { fontSize: 14, color: '#94A3B8', textAlign: 'center', paddingHorizontal: 24, marginTop: 4 },
   listingCard: { backgroundColor: '#FFFFFF', borderRadius: 12, marginBottom: 16, marginHorizontal: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3.84, elevation: 5, overflow: 'hidden', width: '47%' },
-  listingImage: { width: '100%', height: 200, backgroundColor: '#F1F5F9' },
+  listingImage: { width: '100%', height: 200, backgroundColor: '#F1F5F9', resizeMode: 'cover' },
   listingInfo: { padding: 12 },
   listingTitle: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 4 },
   listingPrice: { fontSize: 16, fontWeight: 'bold', color: '#4338CA', marginBottom: 8 },

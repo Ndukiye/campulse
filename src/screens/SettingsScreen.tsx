@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeContext';
 
 const SettingsScreen = () => {
   const { signOut } = useAuth();
+  const { isDark, toggleTheme, colors } = useThemeMode();
   const [settings, setSettings] = useState({
-    darkMode: false,
     locationServices: true,
     saveHistory: true,
   });
@@ -76,7 +77,7 @@ const SettingsScreen = () => {
   const renderSettingItem = (
     title: string,
     description: string,
-    key: keyof typeof settings,
+    key: 'darkMode' | keyof typeof settings,
     icon: string
   ) => (
     <View style={styles.settingItem}>
@@ -88,23 +89,29 @@ const SettingsScreen = () => {
         <Text style={styles.settingDescription}>{description}</Text>
       </View>
       <Switch
-        value={settings[key]}
-        onValueChange={() => toggleSetting(key)}
+        value={key === 'darkMode' ? isDark : settings[key as keyof typeof settings]}
+        onValueChange={() => {
+          if (key === 'darkMode') {
+            toggleTheme();
+          } else {
+            toggleSetting(key as keyof typeof settings);
+          }
+        }}
         trackColor={{ false: '#E2E8F0', true: '#C7D2FE' }}
-        thumbColor={settings[key] ? '#6366F1' : '#F8FAFC'}
+        thumbColor={(key === 'darkMode' ? isDark : settings[key as keyof typeof settings]) ? '#6366F1' : '#F8FAFC'}
       />
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }] }>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }] }>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
       </View>
 
       <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Settings</Text>
+        <View style={[styles.section, { backgroundColor: colors.card }] }>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>App Settings</Text>
           {renderSettingItem(
             'Dark Mode',
             'Enable dark theme for the app',
@@ -125,7 +132,7 @@ const SettingsScreen = () => {
           )}
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: colors.card }] }>
           <Text style={styles.sectionTitle}>Storage</Text>
           <TouchableOpacity
             style={styles.actionButton}
@@ -137,7 +144,7 @@ const SettingsScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.section, styles.accountSection]}>
+        <View style={[styles.section, styles.accountSection, { backgroundColor: colors.card }] }>
           <Text style={styles.sectionTitle}>Account</Text>
           <TouchableOpacity
             style={[styles.actionButton, styles.logoutButton]}
@@ -245,4 +252,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SettingsScreen; 
+export default SettingsScreen;

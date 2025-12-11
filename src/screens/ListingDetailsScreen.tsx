@@ -20,6 +20,7 @@ import { getProductById, searchProducts, type ProductSummary } from '../services
 import type { ProfilesRow } from '../types/database';
 import { getProfileById } from '../services/profileService';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeContext';
 import { isFavorite as checkFavorite, addFavorite, removeFavorite } from '../services/favoritesService';
 
 const { width } = Dimensions.get('window');
@@ -29,6 +30,7 @@ const ListingDetailsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'ListingDetails'>>();
   const params = route.params;
   const { user } = useAuth();
+  const { colors } = useThemeMode();
 
   const [currentProduct, setCurrentProduct] = useState<ProductSummary | undefined>(undefined);
 
@@ -206,15 +208,15 @@ const ListingDetailsScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{currentProduct.title}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{currentProduct.title}</Text>
         <TouchableOpacity 
           style={styles.heartButton}
           onPress={async () => {
@@ -239,7 +241,7 @@ const ListingDetailsScreen = () => {
             }
           }}
         >
-          <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? "#FF0000" : "#1E293B"} />
+          <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? "#FF0000" : colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -487,7 +489,7 @@ const styles = StyleSheet.create({
   productImage: {
     width: width,
     height: 300,
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   imageCounter: {
     position: 'absolute',
@@ -760,6 +762,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderTopLeftRadius: 9,
     borderTopRightRadius: 9,
+    resizeMode: 'cover',
   },
   relatedItemInfo: {
     padding: 10,

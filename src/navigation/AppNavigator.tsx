@@ -1,10 +1,11 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList, MainTabParamList } from '../types/navigation';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeContext';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
@@ -20,6 +21,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
 import SellerProfileScreen from '../screens/SellerProfileScreen';
+import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -89,6 +91,7 @@ const MainTabs = () => {
 
 const AppNavigator = () => {
   const { isAuthenticated, loading } = useAuth();
+  const { isDark, colors } = useThemeMode();
 
   console.log('[AppNavigator] Render - isAuthenticated:', isAuthenticated, 'loading:', loading);
 
@@ -97,8 +100,21 @@ const AppNavigator = () => {
     return null; // Or a loading screen
   }
 
+  const base = isDark ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      border: colors.border,
+      primary: colors.primary,
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navTheme}>
       <Stack.Navigator 
         screenOptions={{ 
           headerShown: false,
@@ -167,6 +183,11 @@ const AppNavigator = () => {
             <Stack.Screen 
               name="HelpSupport" 
               component={HelpSupportScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="AdminDashboard" 
+              component={AdminDashboardScreen}
               options={{ headerShown: false }}
             />
           </>

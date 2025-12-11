@@ -129,7 +129,7 @@ export async function ensureConversation(userA: string, userB: string) {
 export type ConversationSummary = {
   id: string;
   otherUser: { id: string; name: string; avatar_url: string | null; verified: boolean };
-  lastMessage?: { text: string | null; type: 'text' | 'image' | 'document'; created_at: string | null };
+  lastMessage?: { text: string | null; type: 'text' | 'image' | 'document'; created_at: string | null; senderId: string };
   unreadCount: number;
   product?: { id: string; title: string; image?: string | null } | null;
 };
@@ -149,7 +149,7 @@ export async function listConversations(userId: string) {
       supabase.from('profiles').select('id,name,avatar_url,verified').eq('id', otherId).maybeSingle(),
       supabase
         .from('messages')
-        .select('content,message_type,created_at')
+        .select('content,message_type,created_at,sender_id')
         .eq('conversation_id', c.id)
         .order('created_at', { ascending: false })
         .limit(1),
@@ -174,7 +174,7 @@ export async function listConversations(userId: string) {
       : { id: otherId, name: 'User', avatar_url: null, verified: false };
     const lastRow = Array.isArray(lastMsgRes.data) ? lastMsgRes.data[0] : null;
     const lastMessage = lastRow
-      ? { text: lastRow.content ?? null, type: (lastRow.message_type ?? 'text') as any, created_at: lastRow.created_at ?? null }
+      ? { text: lastRow.content ?? null, type: (lastRow.message_type ?? 'text') as any, created_at: lastRow.created_at ?? null, senderId: lastRow.sender_id }
       : undefined;
     const unreadCount = unreadRes.count ?? 0;
     const product = productRes.data

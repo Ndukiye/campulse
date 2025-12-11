@@ -14,9 +14,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeContext';
 
 const AuthScreen = () => {
   const { loading, signIn, signUp } = useAuth();
+  const { colors } = useThemeMode();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
@@ -93,14 +95,14 @@ const AuthScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#0000ff" />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
@@ -111,9 +113,9 @@ const AuthScreen = () => {
         >
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>CamPulse</Text>
+              <Text style={[styles.logoText, { color: colors.primary }]}>CamPulse</Text>
             </View>
-            <Text style={styles.title}>Welcome to CamPulse</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Welcome to CamPulse</Text>
             <Text style={styles.subtitle}>
               {isLogin ? 'Sign in to continue' : 'Create your account'}
             </Text>

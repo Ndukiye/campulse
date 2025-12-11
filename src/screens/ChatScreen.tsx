@@ -12,9 +12,11 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
 import { useAuth } from '../context/AuthContext';
 import { pickImage, pickDocument, Attachment, formatFileSize, getFileIcon } from '../utils/chatUtils';
@@ -29,6 +31,7 @@ import {
 } from '../services/chatService';
 import { uploadChatAttachment } from '../services/storageService';
 import { getProfileById } from '../services/profileService';
+import { useThemeMode } from '../context/ThemeContext';
 
 const ChatScreen = () => {
   const route = useRoute<RouteProp<import('../types/navigation').RootStackParamList, 'Chat'>>();
@@ -47,6 +50,9 @@ const ChatScreen = () => {
   const [otherProfileName, setOtherProfileName] = useState<string>('');
   const [otherProfileAvatar, setOtherProfileAvatar] = useState<string | null>(null);
   const [otherVerified, setOtherVerified] = useState<boolean>(false);
+  const { colors, isDark } = useThemeMode();
+  const bannerAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     const setup = async () => {
@@ -59,6 +65,9 @@ const ChatScreen = () => {
           setOtherProfileAvatar(prof.data.avatar_url ?? null);
           setOtherVerified(!!prof.data.verified);
         }
+        try {
+          await markMessagesAsRead(conv.id, user.id);
+        } catch {}
       }
     };
     setup();
@@ -73,21 +82,54 @@ const ChatScreen = () => {
     });
 
     // Subscribe to typing status
-    const unsubscribeTyping = subscribeToTypingStatus(
-      conversationId,
-      otherUserId,
-      (isTyping) => setIsOtherTyping(isTyping)
-    );
+    if (user?.id) {
+      const unsubscribeTyping = subscribeToTypingStatus(
+        conversationId,
+        user.id,
+        (isTyping) => setIsOtherTyping(isTyping)
+      );
+
+      return () => {
+        unsubscribeMessages();
+        unsubscribeTyping();
+      };
+    }
 
     return () => {
       unsubscribeMessages();
-      unsubscribeTyping();
     };
   }, [conversationId, otherUserId, user?.id]);
+
+  useEffect(() => {
+    if (isFocused && conversationId && user?.id) {
+      markMessagesAsRead(conversationId, user.id).catch(() => {});
+    }
+  }, [isFocused, conversationId, user?.id]);
 
   const handleBack = () => {
     navigation.goBack();
   };
+
+  useEffect(() => {
+    const w = Dimensions.get('window').width;
+    bannerAnim.setValue(w);
+    let mounted = true;
+    const loop = () => {
+      if (!mounted) return;
+      Animated.timing(bannerAnim, {
+        toValue: -w,
+        duration: 16000,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && mounted) {
+          bannerAnim.setValue(w);
+          loop();
+        }
+      });
+    };
+    loop();
+    return () => { mounted = false; };
+  }, [bannerAnim]);
 
   const handleOptions = () => {
     Alert.alert(
@@ -166,6 +208,22 @@ const ChatScreen = () => {
     }, 2000);
   };
 
+  const containsRestricted = (text: string) => {
+    const email = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(text);
+    let phone = false;
+    let account = false;
+    const candidates = text.match(/[\+\d][\d \-\(\)]{9,}/g) ?? [];
+    for (const c of candidates) {
+      const n = c.replace(/[^\d]/g, '');
+      if (n.length >= 11) {
+        if (n.startsWith('234') && n.length >= 13) { phone = true; break; }
+        if (n.startsWith('0') && n.length === 11) { phone = true; break; }
+      }
+      if (n.length === 10) { account = true; break; }
+    }
+    return email || phone || account;
+  };
+
   const handleSend = async () => {
     if (!message.trim() && !attachment) return;
     if (!conversationId) return;
@@ -176,6 +234,13 @@ const ChatScreen = () => {
         Alert.alert('Sign in required', 'Please sign in to send messages.');
         setIsLoading(false);
         return;
+      }
+      if (message.trim()) {
+        if (containsRestricted(message.trim())) {
+          Alert.alert('Restricted Content', 'Remove phone numbers, bank account numbers, or emails before sending.');
+          setIsLoading(false);
+          return;
+        }
       }
       let finalAttachment: { type: 'image' | 'document'; uri: string; name: string; size?: number; mimeType?: string } | undefined;
       if (attachment) {
@@ -234,7 +299,7 @@ const ChatScreen = () => {
     ]}>
       <View style={[
         styles.messageBubble,
-        item.senderId === user?.id ? styles.userBubble : styles.sellerBubble
+        item.senderId === user?.id ? [styles.userBubble, { backgroundColor: colors.primary }] : [styles.sellerBubble, { borderColor: colors.border, backgroundColor: colors.card }]
       ]}>
         {item.attachment && (
           <View style={styles.attachmentContainer}>
@@ -255,9 +320,13 @@ const ChatScreen = () => {
             )}
           </View>
         )}
-        {item.text && <Text style={styles.messageText}>{item.text}</Text>}
+        {item.text && (
+          <Text style={[styles.messageText, item.senderId === user?.id ? { color: '#FFFFFF' } : { color: colors.text }]}>
+            {item.text}
+          </Text>
+        )}
         <View style={styles.messageFooter}>
-          <Text style={styles.timestamp}>
+          <Text style={[styles.timestamp, { color: colors.muted }]}>
             {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
           {item.senderId === user?.id && (
@@ -274,38 +343,46 @@ const ChatScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={handleBack}
         >
-          <Ionicons name="arrow-back" size={22} color="#1E293B" />
+          <Ionicons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {otherProfileAvatar ? (
               <Image source={{ uri: otherProfileAvatar }} style={{ width: 24, height: 24, borderRadius: 12 }} />
             ) : null}
-            <Text style={styles.headerName}>{otherProfileName}</Text>
+            <Text style={[styles.headerName, { color: colors.text }]}>{otherProfileName}</Text>
             {otherVerified && <Ionicons name="checkmark-circle" size={16} color="#10B981" />}
           </View>
-          <Text style={styles.headerStatus}>
-            {isOtherTyping ? 'typing...' : 'Online'}
+          <Text style={[styles.headerStatus, { color: colors.muted }]}>
+            {isOtherTyping ? 'typing...' : ''}
           </Text>
         </View>
         <TouchableOpacity 
           style={styles.headerIcon}
           onPress={handleOptions}
         >
-          <Ionicons name="ellipsis-vertical" size={22} color="#1E293B" />
+          <Ionicons name="ellipsis-vertical" size={22} color={colors.text} />
         </TouchableOpacity>
+      </View>
+      <View style={[styles.safetyBannerContainer, { backgroundColor: colors.card }]}> 
+        <Animated.View style={{ transform: [{ translateX: bannerAnim }] }}>
+          <View style={styles.safetyBannerContent}>
+            <Ionicons name="alert-circle-outline" size={14} color={colors.muted} />
+            <Text style={[styles.safetyBannerText, { color: colors.muted }]}>Payments outside the app are at your own risk.</Text>
+          </View>
+        </Animated.View>
       </View>
 
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
         {/* Messages */}
@@ -315,15 +392,23 @@ const ChatScreen = () => {
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messagesList}
+          keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => {
             if (messages.length > 0) {
-              flatListRef.current?.scrollToIndex({ index: messages.length - 1, animated: true });
+              flatListRef.current?.scrollToIndex({ index: messages.length - 1, animated: true, viewPosition: 1 });
             }
+          }}
+          onScrollToIndexFailed={(info) => {
+            const offset = info.averageItemLength * info.index;
+            flatListRef.current?.scrollToOffset({ offset, animated: true });
+            setTimeout(() => {
+              flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 1 });
+            }, 100);
           }}
         />
 
         {/* Input */}
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
           {renderAttachment()}
           <TouchableOpacity 
             style={styles.attachButton}
@@ -332,7 +417,7 @@ const ChatScreen = () => {
             <Ionicons name="attach" size={24} color="#6366F1" />
           </TouchableOpacity>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: isDark ? '#1F2937' : '#F1F5F9', color: colors.text }]}
             placeholder="Type a message..."
             value={message}
             onChangeText={handleTyping}
@@ -459,6 +544,20 @@ const styles = StyleSheet.create({
     color: '#1E293B',
     maxHeight: 100,
   },
+  safetyBannerContainer: {
+    height: 24,
+    overflow: 'hidden',
+  },
+  safetyBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  safetyBannerText: {
+    fontSize: 11,
+  },
   sendButton: {
     width: 40,
     height: 40,
@@ -529,3 +628,4 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
+  

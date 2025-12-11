@@ -15,9 +15,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeContext';
 import type { ProfilesRow } from '../types/database';
 import { getProfileById, upsertProfile } from '../services/profileService';
 import { countProductsBySeller, getProductsBySeller, type ProductSummary } from '../services/productService';
@@ -61,6 +62,7 @@ const MOCK_USER = {
 
 const ProfileScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const { colors, isDark } = useThemeMode();
   const { signOut, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'listings' | 'sales' | 'purchases'>('listings');
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -133,117 +135,79 @@ const ProfileScreen = () => {
     };
   }, [user?.id]);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadStats = async () => {
-      if (!user?.id) {
-        if (isMounted) {
+  useFocusEffect(
+    React.useCallback(() => {
+      let isMounted = true;
+      const loadStats = async () => {
+        if (!user?.id) {
+          if (isMounted) {
+            setStats({ listings: 0, sales: 0, purchases: 0 });
+            setLoadingStats(false);
+          }
+          return;
+        }
+        setLoadingStats(true);
+        try {
+          const [listingsRes, salesRes, purchasesRes] = await Promise.all([
+            countProductsBySeller(user.id),
+            countCompletedTransactionsBySeller(user.id),
+            countCompletedTransactionsByBuyer(user.id),
+          ]);
+          if (!isMounted) return;
+          setStats({
+            listings: listingsRes.count ?? 0,
+            sales: salesRes.count ?? 0,
+            purchases: purchasesRes.count ?? 0,
+          });
+        } catch (error) {
+          if (!isMounted) return;
           setStats({ listings: 0, sales: 0, purchases: 0 });
-          setLoadingStats(false);
+        } finally {
+          if (isMounted) setLoadingStats(false);
         }
-        return;
-      }
+      };
+      loadStats();
+      return () => { isMounted = false; };
+    }, [user?.id])
+  );
 
-      setLoadingStats(true);
-      try {
-        const [listingsRes, salesRes, purchasesRes] = await Promise.all([
-          countProductsBySeller(user.id),
-          countCompletedTransactionsBySeller(user.id),
-          countCompletedTransactionsByBuyer(user.id),
-        ]);
-
-        if (!isMounted) return;
-
-        if (listingsRes.error) {
-          console.warn('[ProfileScreen] Failed to count listings:', listingsRes.error);
+  useFocusEffect(
+    React.useCallback(() => {
+      let isMounted = true;
+      const loadLists = async () => {
+        if (!user?.id) {
+          if (isMounted) {
+            setListings([]);
+            setSales([]);
+            setPurchases([]);
+            setLoadingLists(false);
+          }
+          return;
         }
-        if (salesRes.error) {
-          console.warn('[ProfileScreen] Failed to count sales:', salesRes.error);
-        }
-        if (purchasesRes.error) {
-          console.warn('[ProfileScreen] Failed to count purchases:', purchasesRes.error);
-        }
-
-        setStats({
-          listings: listingsRes.count ?? 0,
-          sales: salesRes.count ?? 0,
-          purchases: purchasesRes.count ?? 0,
-        });
-      } catch (error) {
-        if (!isMounted) return;
-        console.error('[ProfileScreen] Unexpected error loading stats:', error);
-        setStats({ listings: 0, sales: 0, purchases: 0 });
-      } finally {
-        if (isMounted) {
-          setLoadingStats(false);
-        }
-      }
-    };
-
-    loadStats();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadLists = async () => {
-      if (!user?.id) {
-        if (isMounted) {
+        setLoadingLists(true);
+        try {
+          const [listingsRes, salesRes, purchasesRes] = await Promise.all([
+            getProductsBySeller(user.id, 20),
+            getSalesBySeller(user.id, 20),
+            getPurchasesByBuyer(user.id, 20),
+          ]);
+          if (!isMounted) return;
+          setListings(listingsRes.data ?? []);
+          setSales(salesRes.data ?? []);
+          setPurchases(purchasesRes.data ?? []);
+        } catch (error) {
+          if (!isMounted) return;
           setListings([]);
           setSales([]);
           setPurchases([]);
-          setLoadingLists(false);
+        } finally {
+          if (isMounted) setLoadingLists(false);
         }
-        return;
-      }
-
-      setLoadingLists(true);
-      try {
-        const [listingsRes, salesRes, purchasesRes] = await Promise.all([
-          getProductsBySeller(user.id, 20),
-          getSalesBySeller(user.id, 20),
-          getPurchasesByBuyer(user.id, 20),
-        ]);
-
-        if (!isMounted) return;
-
-        if (listingsRes.error) {
-          console.warn('[ProfileScreen] Failed to fetch listings:', listingsRes.error);
-        }
-        if (salesRes.error) {
-          console.warn('[ProfileScreen] Failed to fetch sales:', salesRes.error);
-        }
-        if (purchasesRes.error) {
-          console.warn('[ProfileScreen] Failed to fetch purchases:', purchasesRes.error);
-        }
-
-        setListings(listingsRes.data ?? []);
-        setSales(salesRes.data ?? []);
-        setPurchases(purchasesRes.data ?? []);
-      } catch (error) {
-        if (!isMounted) return;
-        console.error('[ProfileScreen] Unexpected error loading lists:', error);
-        setListings([]);
-        setSales([]);
-        setPurchases([]);
-      } finally {
-        if (isMounted) {
-          setLoadingLists(false);
-        }
-      }
-    };
-
-    loadLists();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id]);
+      };
+      loadLists();
+      return () => { isMounted = false; };
+    }, [user?.id])
+  );
 
   // Filter active listings and limit to 4
   const listingPreview = listings.slice(0, 4);
@@ -501,7 +465,7 @@ const ProfileScreen = () => {
     const buyerId = item.buyerId;
 
     return (
-    <View style={styles.transactionCard}>
+    <View style={[styles.transactionCard, { backgroundColor: colors.card }]}>
       <View style={styles.transactionHeader}>
           <Text style={styles.transactionTitle}>{item.productTitle}</Text>
           <Text style={styles.transactionPrice}>
@@ -538,7 +502,7 @@ const ProfileScreen = () => {
     const sellerId = item.sellerId;
 
     return (
-    <View style={styles.transactionCard}>
+    <View style={[styles.transactionCard, { backgroundColor: colors.card }]}>
       <View style={styles.transactionHeader}>
           <Text style={styles.transactionTitle}>{item.productTitle}</Text>
           <Text style={styles.transactionPrice}>
@@ -694,7 +658,7 @@ const ProfileScreen = () => {
   const displayLocation = profile?.location ?? '';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={[1]} // Single item to render the sections
         renderItem={() => (
@@ -842,37 +806,45 @@ const ProfileScreen = () => {
             {renderContent()}
 
             {/* Settings Section */}
-            <View style={styles.settingsContainer}>
+            <View style={[styles.settingsContainer, { backgroundColor: colors.card }]}>
               <TouchableOpacity 
                 style={styles.settingItem}
                 onPress={() => navigation.navigate('Settings')}
               >
-                <Ionicons name="settings-outline" size={24} color="#1E293B" />
-                <Text style={styles.settingText}>Settings</Text>
+                <Ionicons name="settings-outline" size={24} color={colors.text} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Settings</Text>
                 <Ionicons name="chevron-forward" size={24} color="#94A3B8" />
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.settingItem}
                 onPress={() => navigation.navigate('PrivacySecurity')}
               >
-                <Ionicons name="shield-checkmark-outline" size={24} color="#1E293B" />
-                <Text style={styles.settingText}>Privacy & Security</Text>
+                <Ionicons name="shield-checkmark-outline" size={24} color={colors.text} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Privacy & Security</Text>
                 <Ionicons name="chevron-forward" size={24} color="#94A3B8" />
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.settingItem}
                 onPress={() => navigation.navigate('HelpSupport')}
               >
-                <Ionicons name="help-circle-outline" size={24} color="#1E293B" />
-                <Text style={styles.settingText}>Help & Support</Text>
+                <Ionicons name="help-circle-outline" size={24} color={colors.text} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Help & Support</Text>
+                <Ionicons name="chevron-forward" size={24} color="#94A3B8" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.settingItem}
+                onPress={() => navigation.navigate('AdminDashboard')}
+              >
+                <Ionicons name="speedometer-outline" size={24} color={colors.text} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Admin Dashboard</Text>
                 <Ionicons name="chevron-forward" size={24} color="#94A3B8" />
               </TouchableOpacity>
             </View>
 
             {/* Logout Button */}
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <TouchableOpacity style={[styles.logoutButton, { backgroundColor: isDark ? '#7F1D1D' : '#FEE2E2' }]} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={24} color="#DC2626" />
-              <Text style={styles.logoutText}>Log Out</Text>
+              <Text style={[styles.logoutText, { color: '#DC2626' }]}>Log Out</Text>
             </TouchableOpacity>
           </>
         )}

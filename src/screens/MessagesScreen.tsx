@@ -12,41 +12,45 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RootStackNavigationProp } from '../types/navigation';
 import { useAuth } from '../context/AuthContext';
+import { useThemeMode } from '../context/ThemeContext';
 import { listConversations, type ConversationSummary } from '../services/chatService';
 
 type Conversation = ConversationSummary;
 
 const MessagesScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
+  const { colors } = useThemeMode();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (!user?.id) {
-        setConversations([]);
+  useFocusEffect(
+    React.useCallback(() => {
+      let mounted = true;
+      const load = async () => {
+        if (!user?.id) {
+          setConversations([]);
+          setLoading(false);
+          return;
+        }
+        setLoading(true);
+        const res = await listConversations(user.id);
+        if (!mounted) return;
+        if (res.error) {
+          setConversations([]);
+        } else {
+          setConversations(res.data ?? []);
+        }
         setLoading(false);
-        return;
-      }
-      setLoading(true);
-      const res = await listConversations(user.id);
-      if (!mounted) return;
-      if (res.error) {
-        setConversations([]);
-      } else {
-        setConversations(res.data ?? []);
-      }
-      setLoading(false);
-    };
-    load();
-    return () => { mounted = false; };
-  }, [user?.id]);
+      };
+      load();
+      return () => { mounted = false; };
+    }, [user?.id])
+  );
 
   const filteredConversations = conversations.filter(conv =>
     (conv.otherUser.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -55,7 +59,7 @@ const MessagesScreen = () => {
 
   const renderConversation = ({ item }: { item: Conversation }) => (
     <TouchableOpacity
-      style={styles.conversationItem}
+      style={[styles.conversationItem, { backgroundColor: colors.card }]}
       onPress={() => navigation.navigate('Chat', { userId: item.otherUser.id })}
     >
       <View style={styles.avatarContainer}>
@@ -68,20 +72,20 @@ const MessagesScreen = () => {
       </View>
       <View style={styles.conversationContent}>
         <View style={styles.conversationHeader}>
-          <Text style={styles.userName}>{item.otherUser.name}</Text>
-          <Text style={styles.timestamp}>{item.lastMessage?.created_at ? new Date(item.lastMessage.created_at).toLocaleString() : ''}</Text>
+          <Text style={[styles.userName, { color: colors.text }]}>{item.otherUser.name}</Text>
+          <Text style={[styles.timestamp, { color: colors.muted }]}>{item.lastMessage?.created_at ? new Date(item.lastMessage.created_at).toLocaleString() : ''}</Text>
         </View>
         <View style={styles.messageContainer}>
           <Text 
             style={[
               styles.lastMessage,
-              item.unreadCount > 0 && styles.unreadMessage
+              item.unreadCount > 0 && item.lastMessage?.senderId !== user?.id && styles.unreadMessage
             ]}
             numberOfLines={1}
           >
             {item.lastMessage?.text ?? ''}
           </Text>
-          {item.unreadCount > 0 && <View style={styles.unreadDot} />}
+          {item.unreadCount > 0 && item.lastMessage?.senderId !== user?.id && <View style={styles.unreadDot} />}
         </View>
         {item.product && (
           <View style={styles.productPreview}>
@@ -89,7 +93,7 @@ const MessagesScreen = () => {
               source={{ uri: item.product.image ?? 'https://placehold.co/200x200?text=CamPulse' }} 
               style={styles.productImage}
             />
-            <Text style={styles.productTitle} numberOfLines={1}>
+            <Text style={[styles.productTitle, { color: colors.muted }]} numberOfLines={1}>
               {item.product.title}
             </Text>
           </View>
@@ -99,36 +103,36 @@ const MessagesScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Messages</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Messages</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 
             style={styles.headerIcon}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <Ionicons name="notifications-outline" size={24} color="#1E293B" />
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+      <View style={[styles.searchContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Ionicons name="search" size={20} color={colors.muted} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.text }]}
           placeholder="Search conversations"
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={colors.muted}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity
             style={styles.clearButton}
             onPress={() => setSearchQuery('')}
           >
-            <Ionicons name="close-circle" size={20} color="#94A3B8" />
+            <Ionicons name="close-circle" size={20} color={colors.muted} />
           </TouchableOpacity>
         )}
       </View>
