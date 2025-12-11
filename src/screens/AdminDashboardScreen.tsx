@@ -17,6 +17,10 @@ type AdminUser = {
   email: string
   verified: boolean
   verification_status?: import('../types/database').VerificationStatus | null
+  phone?: string | null
+  location?: string | null
+  matric_number?: string | null
+  created_at?: string | null
 }
 
 const AdminDashboardScreen = () => {
@@ -24,7 +28,7 @@ const AdminDashboardScreen = () => {
   const { colors } = useThemeMode()
   const { user } = useAuth()
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'products' | 'transactions' | 'notifications'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'products' | 'transactions' | 'notifications' | 'logs'>('overview')
   const [loading, setLoading] = useState(false)
 
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -45,6 +49,17 @@ const AdminDashboardScreen = () => {
   const [productsMaxPrice, setProductsMaxPrice] = useState<string>('')
   const [productsSortBy, setProductsSortBy] = useState<'newest' | 'price_asc' | 'price_desc'>('newest')
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
+  const [notifTitle, setNotifTitle] = useState('')
+  const [notifBody, setNotifBody] = useState('')
+  const [notifType, setNotifType] = useState<'system' | 'message' | 'favorite' | 'review' | 'product_sold'>('system')
+  const [audienceVerified, setAudienceVerified] = useState(false)
+  const [showRecipientModal, setShowRecipientModal] = useState(false)
+  const [recipientEmail, setRecipientEmail] = useState('')
+  const [recipientProfile, setRecipientProfile] = useState<{ id: string, name?: string | null, email?: string | null } | null>(null)
+  const [recipientQuery, setRecipientQuery] = useState('')
+  const [recipientResults, setRecipientResults] = useState<any[]>([])
+  const [recipientSearching, setRecipientSearching] = useState(false)
+  const [expandedUserIds, setExpandedUserIds] = useState<Record<string, boolean>>({})
 
   const [transactions, setTransactions] = useState<any[]>([])
   const [notificationsCount, setNotificationsCount] = useState(0)
@@ -58,6 +73,11 @@ const AdminDashboardScreen = () => {
     totalSalesValue: 0,
     pendingTransactions: 0,
   })
+  const [adminsCount, setAdminsCount] = useState(0)
+  const [adminLogs, setAdminLogs] = useState<any[]>([])
+  const [logsPage, setLogsPage] = useState(0)
+  const [logsPageSize] = useState(30)
+  const [logsHasMore, setLogsHasMore] = useState(false)
   const [productsSearch, setProductsSearch] = useState('')
   const [txPage, setTxPage] = useState(0)
   const [txPageSize] = useState(20)
@@ -89,7 +109,7 @@ const AdminDashboardScreen = () => {
           .or('verified.eq.true,verification_status.eq.approved')
         const { count: productsCount } = await supabase.from('products').select('id', { head: true, count: 'exact' })
         const { count: txCount } = await supabase.from('transactions').select('id', { head: true, count: 'exact' })
-        const { count: adminsCount } = await supabase.from('app_admins').select('user_id', { head: true, count: 'exact' })
+        const { count: adminsCountVal } = await supabase.from('app_admins').select('user_id', { head: true, count: 'exact' })
 
         const sevenDaysAgo = new Date()
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
@@ -117,16 +137,6 @@ const AdminDashboardScreen = () => {
           .select('id', { head: true, count: 'exact' })
           .eq('status', 'pending')
 
-        const { count: pendingVerifications } = await supabase
-          .from('profiles')
-          .select('id', { head: true, count: 'exact' })
-          .eq('verification_status', 'pending')
-
-        const { count: completedLast7Days } = await supabase
-          .from('transactions')
-          .select('id', { head: true, count: 'exact' })
-          .eq('status', 'completed')
-          .gte('created_at', sevenDaysAgoISO)
 
         setOverviewCounts({
           users: usersCount ?? 0,
@@ -137,9 +147,8 @@ const AdminDashboardScreen = () => {
           newProductsLast7Days: newProductsLast7Days ?? 0,
           totalSalesValue: totalSalesValue,
           pendingTransactions: pendingTransactions ?? 0,
-          // extra metrics in local state extension
-          // we'll keep them in separate local states rendered below
         })
+        setAdminsCount(adminsCountVal ?? 0)
         const notif = user?.id ? await fetchNotifications(user.id, 1) : { data: [] }
         setNotificationsCount((notif.data ?? []).length)
       } finally {
@@ -149,13 +158,53 @@ const AdminDashboardScreen = () => {
     loadOverview()
   }, [user?.id, activeTab])
 
+  const searchRecipients = async (q: string) => {
+    setRecipientQuery(q)
+    const s = q.trim()
+    if (!s) { setRecipientResults([]); return }
+    setRecipientSearching(true)
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id,name,email')
+      .or(`name.ilike.%${s}%,email.ilike.%${s}%`)
+      .limit(10)
+    if (!error) setRecipientResults(data ?? [])
+    setRecipientSearching(false)
+  }
+
+  useEffect(() => {
+    const loadInitialRecipients = async () => {
+      setRecipientSearching(true)
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id,name,email')
+        .order('created_at', { ascending: false })
+        .limit(10)
+      if (error) {
+        Alert.alert('Recipients', error.message)
+        setRecipientResults([])
+      } else {
+        setRecipientResults(data ?? [])
+      }
+      setRecipientSearching(false)
+    }
+    if (showRecipientModal) {
+      setRecipientQuery('')
+      if (users.length) {
+        setRecipientResults(users.map(u => ({ id: u.id, name: u.name, email: u.email })))
+      } else {
+        loadInitialRecipients()
+      }
+    }
+  }, [showRecipientModal])
+
   const loadUsers = async (opts?: { append?: boolean }) => {
     setLoading(true)
     const from = usersPage * usersPageSize
     const to = from + usersPageSize - 1
     let q = supabase
       .from('profiles')
-      .select('id,name,email,verified,verification_status')
+      .select('id,name,email,verified,verification_status,phone,location,matric_number,created_at')
       .order('created_at', { ascending: false })
       .range(from, to)
     if (usersSearch.trim()) {
@@ -170,7 +219,7 @@ const AdminDashboardScreen = () => {
       setUsers([])
       setUsersHasMore(false)
     } else {
-      const rows = (data ?? []).map((p: any) => ({ id: p.id, name: p.name ?? 'User', email: p.email, verified: !!p.verified, verification_status: p.verification_status ?? null }))
+      const rows = (data ?? []).map((p: any) => ({ id: p.id, name: p.name ?? 'User', email: p.email, verified: !!p.verified, verification_status: p.verification_status ?? null, phone: p.phone ?? null, location: p.location ?? null, matric_number: p.matric_number ?? null, created_at: p.created_at ?? null }))
       setUsers(prev => (opts?.append ? prev.concat(rows) : rows))
       setUsersHasMore(rows.length === usersPageSize)
     }
@@ -187,6 +236,7 @@ const AdminDashboardScreen = () => {
       return
     }
     setUsers(prev => prev.map(x => x.id === u.id ? { ...x, verified: !u.verified, verification_status: !u.verified ? 'approved' : 'none' } : x))
+    logActivity(!u.verified ? 'verify_user' : 'unverify_user', { user_id: u.id })
   }
 
   const loadProducts = async (opts?: { append?: boolean }) => {
@@ -217,6 +267,7 @@ const AdminDashboardScreen = () => {
           Alert.alert('Error', del.error)
         } else {
           setProducts(prev => prev.filter(x => x.id !== p.id))
+          logActivity('delete_product', { product_id: p.id })
         }
       } }
     ])
@@ -245,17 +296,59 @@ const AdminDashboardScreen = () => {
     }
   }
 
+  const loadAdminLogs = async (opts?: { append?: boolean }) => {
+    const from = logsPage * logsPageSize
+    const to = from + logsPageSize - 1
+    const { data, error } = await supabase
+      .from('admin_activity_logs')
+      .select('id,admin_id,action,details,created_at,admin:admin_id(id,name,email)')
+      .order('created_at', { ascending: false })
+      .range(from, to)
+    if (error) {
+      setAdminLogs([])
+      setLogsHasMore(false)
+    } else {
+      const rows = data ?? []
+      setAdminLogs(prev => (opts?.append ? prev.concat(rows) : rows))
+      setLogsHasMore(rows.length === logsPageSize)
+    }
+  }
+
   useEffect(() => {
     if (activeTab === 'users') { setUsersPage(0); loadUsers() }
     if (activeTab === 'products') { setProductsPage(0); loadProducts() }
     if (activeTab === 'transactions') { setTxPage(0); loadTransactions() }
+    if (activeTab === 'logs') { setLogsPage(0); loadAdminLogs() }
   }, [activeTab])
+
+  const logActivity = async (action: string, details?: any) => {
+    try {
+      if (!isAdmin || !user?.id) return
+      await supabase.from('admin_activity_logs').insert([{ admin_id: user.id, action, details: details ?? null }])
+    } catch (_) { /* ignore logging errors */ }
+  }
+
+  useEffect(() => {
+    if (isAdmin) {
+      logActivity('enter_dashboard')
+    }
+    return () => { if (isAdmin) logActivity('exit_dashboard') }
+  }, [isAdmin])
 
   const renderUser = ({ item }: { item: AdminUser }) => (
     <View style={[styles.listItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={{ flex: 1 }}>
         <Text style={[styles.itemTitle, { color: colors.text }]}>{item.name}</Text>
         <Text style={[styles.itemSub, { color: colors.muted }]}>{item.email}</Text>
+        {expandedUserIds[item.id] && (
+          <View style={styles.detailsBox}>
+            <Text style={[styles.detailsText, { color: colors.muted }]}>Phone: {item.phone ?? 'N/A'}</Text>
+            <Text style={[styles.detailsText, { color: colors.muted }]}>Location: {item.location ?? 'N/A'}</Text>
+            <Text style={[styles.detailsText, { color: colors.muted }]}>Matric: {item.matric_number ?? 'N/A'}</Text>
+            <Text style={[styles.detailsText, { color: colors.muted }]}>Joined: {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'}</Text>
+            <Text style={[styles.detailsText, { color: colors.muted }]}>Status: {item.verification_status ?? 'none'}</Text>
+          </View>
+        )}
       </View>
       <TouchableOpacity
         style={styles.verifyButton}
@@ -273,6 +366,9 @@ const AdminDashboardScreen = () => {
         disabled={!isAdmin}
       >
         <Ionicons name={item.verified ? 'shield-checkmark' : 'shield-outline'} size={18} color={item.verified ? '#10B981' : '#64748B'} />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.expandButton} onPress={() => setExpandedUserIds(prev => ({ ...prev, [item.id]: !prev[item.id] }))}>
+        <Ionicons name={expandedUserIds[item.id] ? 'chevron-up' : 'chevron-down'} size={18} color={colors.muted} />
       </TouchableOpacity>
     </View>
   )
@@ -312,9 +408,16 @@ const AdminDashboardScreen = () => {
 
       <View style={[styles.tabsBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}> 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScrollContent}>
-          {(['overview','users','products','transactions','notifications'] as const).map(t => (
-            <TouchableOpacity key={t} style={[styles.tabItem, activeTab === t && styles.tabItemActive]} onPress={() => setActiveTab(t)}>
-              <Text style={[styles.tabItemText, activeTab === t && styles.tabItemTextActive]}>{t[0].toUpperCase() + t.slice(1)}</Text>
+          {([
+            { key: 'overview', label: 'Overview' },
+            { key: 'users', label: 'Users' },
+            { key: 'products', label: 'Products' },
+            { key: 'transactions', label: 'Transactions' },
+            { key: 'notifications', label: 'Notifications' },
+            { key: 'logs', label: 'Logs' },
+          ] as const).map(t => (
+            <TouchableOpacity key={t.key} style={[styles.tabItem, activeTab === t.key && styles.tabItemActive]} onPress={() => setActiveTab(t.key)}>
+              <Text style={[styles.tabItemText, activeTab === t.key && styles.tabItemTextActive]}>{t.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -376,19 +479,7 @@ const AdminDashboardScreen = () => {
                 <View style={[styles.metricCard, styles.metricCardLeft, { borderColor: colors.border }]}> 
                   <Ionicons name="key-outline" size={20} color="#6366F1" />
                   <Text style={[styles.metricLabel, { color: colors.muted }]}>Admins</Text>
-                  <Text style={[styles.metricValue, { color: colors.text }]}>{/* will compute below via separate fetch if needed */}</Text>
-                </View>
-                <View style={[styles.metricCard, { borderColor: colors.border }]}> 
-                  <Ionicons name="time-outline" size={20} color="#6366F1" />
-                  <Text style={[styles.metricLabel, { color: colors.muted }]}>Completed (7 Days)</Text>
-                  <Text style={[styles.metricValue, { color: colors.text }]}>{/* render below */}</Text>
-                </View>
-              </View>
-              <View style={styles.metricsRow}>
-                <View style={[styles.metricCard, styles.metricCardLeft, { borderColor: colors.border }]}> 
-                  <Ionicons name="shield-outline" size={20} color="#6366F1" />
-                  <Text style={[styles.metricLabel, { color: colors.muted }]}>Pending Verifications</Text>
-                  <Text style={[styles.metricValue, { color: colors.text }]}>{/* render below */}</Text>
+                  <Text style={[styles.metricValue, { color: colors.text }]}>{adminsCount}</Text>
                 </View>
                 <View style={[styles.metricCard, { borderColor: colors.border }]}> 
                   <Ionicons name="document-text-outline" size={20} color="#6366F1" />
@@ -396,6 +487,7 @@ const AdminDashboardScreen = () => {
                   <Text style={[styles.metricValue, { color: colors.text }]}>{notificationsCount}</Text>
                 </View>
               </View>
+              {/* Charts removed per request */}
             </>
           )}
         </View>
@@ -498,12 +590,14 @@ const AdminDashboardScreen = () => {
 
       {activeTab === 'transactions' && (
         <View style={{ flex: 1 }}> 
-          <View style={[styles.toolbar, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-            {(['all','pending','completed','cancelled','refunded'] as const).map(s => (
-              <TouchableOpacity key={s} style={[styles.toolbarChip, txStatus === s && styles.toolbarChipActive]} onPress={() => { setTxStatus(s); setTxPage(0); loadTransactions() }}>
-                <Text style={[styles.toolbarChipText, { color: txStatus === s ? '#FFFFFF' : colors.text }]}>{s[0].toUpperCase() + s.slice(1)}</Text>
+          <View style={[styles.toolbarTabsBar, { borderBottomColor: colors.border }]}> 
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarTabsScroll}>
+              {(['all','pending','completed','cancelled','refunded'] as const).map(s => (
+              <TouchableOpacity key={s} style={[styles.toolbarTabItem, txStatus === s && styles.toolbarTabItemActive]} onPress={() => { setTxStatus(s); setTxPage(0); loadTransactions(); logActivity('select_tx_status', { status: s }) }}>
+                <Text style={[styles.toolbarTabItemText, txStatus === s && styles.toolbarTabItemTextActive]}>{s[0].toUpperCase() + s.slice(1)}</Text>
               </TouchableOpacity>
-            ))}
+              ))}
+            </ScrollView>
           </View>
           <FlatList data={transactions} renderItem={renderTransaction} keyExtractor={t => t.id} contentContainerStyle={styles.list} />
           {(txHasMore || txPage > 0) && (
@@ -523,16 +617,137 @@ const AdminDashboardScreen = () => {
 
       {activeTab === 'notifications' && (
         <View style={[styles.card, { backgroundColor: colors.card }]}> 
+          <View style={[styles.toolbarTabsBar, { borderBottomColor: colors.border }]}> 
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbarTabsScroll}>
+              {([
+                { key: 'system', label: 'System' },
+                { key: 'message', label: 'Message' },
+                { key: 'favorite', label: 'Favourite' },
+                { key: 'review', label: 'Review' },
+                { key: 'product_sold', label: 'Product Sold' },
+              ] as const).map(t => (
+                <TouchableOpacity key={t.key} style={[styles.toolbarTabItem, notifType === t.key && styles.toolbarTabItemActive]} onPress={() => setNotifType(t.key)}>
+                  <Text style={[styles.toolbarTabItemText, notifType === t.key && styles.toolbarTabItemTextActive]}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+          <View style={[styles.toolbar, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+            <TextInput style={[styles.toolbarInput, { color: colors.text }]} placeholder="Title" value={notifTitle} onChangeText={setNotifTitle} placeholderTextColor={colors.muted} />
+          </View>
+          <View style={[styles.toolbar, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+            <TextInput style={[styles.toolbarInput, { color: colors.text }]} placeholder="Message" value={notifBody} onChangeText={setNotifBody} placeholderTextColor={colors.muted} />
+            {notifType !== 'message' && (
+              <TouchableOpacity style={[styles.toolbarChip, audienceVerified && styles.toolbarChipActive]} onPress={() => setAudienceVerified(!audienceVerified)}>
+                <Text style={[styles.toolbarChipText, { color: audienceVerified ? '#FFFFFF' : colors.text }]}>Only Verified</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {notifType === 'message' && (
+            <View style={[styles.toolbar, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+              <TouchableOpacity style={[styles.toolbarChip, recipientProfile && styles.toolbarChipActive]} onPress={() => setShowRecipientModal(true)}>
+                <Ionicons name="person-circle-outline" size={14} color={recipientProfile ? '#FFFFFF' : colors.text} />
+                <Text style={[styles.toolbarChipText, { color: recipientProfile ? '#FFFFFF' : colors.text }]}>{recipientProfile ? (recipientProfile.name || recipientProfile.email || 'Selected User') : 'Choose Recipient'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <TouchableOpacity style={styles.broadcastButton} onPress={async () => {
-            const { data: allUsers } = await supabase.from('profiles').select('id')
-            const rows = (allUsers ?? []).map((u: any) => ({ user_id: u.id, type: 'system', title: 'Admin Broadcast', body: 'This is a system announcement', data: null, read: false }))
-            const { error } = await supabase.from('notifications').insert(rows)
-            if (error) Alert.alert('Error', error.message)
-            else Alert.alert('Broadcast', 'Notification sent to all users')
+            if (!notifTitle.trim() || !notifBody.trim()) {
+              Alert.alert('Broadcast', 'Enter a title and message')
+              return
+            }
+            Alert.alert('Confirm Broadcast', 'Send this notification?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Send', style: 'destructive', onPress: async () => {
+                if (notifType === 'message') {
+                  if (!recipientProfile?.id) { Alert.alert('Message', 'Select a user to message'); return }
+                  const { error } = await supabase.from('notifications').insert([{ user_id: recipientProfile.id, type: 'message', title: notifTitle.trim(), body: notifBody.trim(), data: null, read: false }])
+                  if (error) Alert.alert('Error', error.message)
+                  else {
+                    Alert.alert('Message', 'Notification sent to user')
+                    setNotifTitle('')
+                    setNotifBody('')
+                    setRecipientProfile(null)
+                    logActivity('message_user', { recipient_id: recipientProfile.id })
+                  }
+                  return
+                }
+                const q = supabase.from('profiles').select('id')
+                const { data: usersList } = audienceVerified ? await q.or('verified.eq.true,verification_status.eq.approved') : await q
+                const rows = (usersList ?? []).map((u: any) => ({ user_id: u.id, type: notifType, title: notifTitle.trim(), body: notifBody.trim(), data: null, read: false }))
+                const { error } = await supabase.from('notifications').insert(rows)
+                if (error) Alert.alert('Error', error.message)
+                else { 
+                  Alert.alert('Broadcast', 'Notification sent')
+                  setNotifTitle('')
+                  setNotifBody('')
+                  logActivity('broadcast', { type: notifType, audienceVerified }) 
+                }
+              } }
+            ])
           }}>
             <Ionicons name="megaphone-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.broadcastText}>Broadcast Announcement</Text>
+            <Text style={styles.broadcastText}>Send Broadcast</Text>
           </TouchableOpacity>
+          <Modal visible={showRecipientModal} transparent animationType="fade" onRequestClose={() => setShowRecipientModal(false)}>
+            <View style={styles.modalBackdrop}>
+              <View style={[styles.modalSheet, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+                <Text style={{ fontWeight: '600', color: colors.text, marginBottom: 8 }}>Select Recipient</Text>
+                <TextInput style={[styles.recipientInput, { color: colors.text, borderColor: colors.border }]} placeholder="Search name or email" value={recipientQuery} onChangeText={searchRecipients} placeholderTextColor={colors.muted} />
+                <View style={{ maxHeight: 240, marginTop: 8 }}>
+                  {recipientSearching ? (
+                    <ActivityIndicator size="small" color="#6366F1" />
+                  ) : recipientResults.length > 0 ? (
+                    <FlatList
+                      data={recipientResults}
+                      keyExtractor={(r) => r.id}
+                      keyboardShouldPersistTaps="handled"
+                      renderItem={({ item }) => (
+                        <TouchableOpacity style={styles.modalItem} onPress={() => { setRecipientProfile({ id: item.id, name: item.name, email: item.email }); setShowRecipientModal(false) }}>
+                          <Ionicons name="person-circle-outline" size={16} color={colors.primary} />
+                          <Text style={[styles.modalItemText, { color: colors.text }]}>{item.name || 'User'} ({item.email})</Text>
+                        </TouchableOpacity>
+                      )}
+                    />
+                  ) : (
+                    <Text style={{ color: colors.muted }}>Start typing to search users</Text>
+                  )}
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
+                  <TouchableOpacity style={styles.toolbarButton} onPress={() => setShowRecipientModal(false)}>
+                    <Text style={{ color: '#DC2626', fontWeight: '600' }}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        </View>
+      )}
+
+      {activeTab === 'logs' && (
+        <View style={{ flex: 1 }}>
+          <FlatList data={adminLogs} keyExtractor={(l) => l.id} renderItem={({ item }) => (
+            <View style={[styles.listItem, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.text }]}>{String(item.action)}</Text>
+                <Text style={[styles.itemSub, { color: colors.muted }]}>{new Date(item.created_at).toLocaleString()}</Text>
+                <Text style={[styles.itemSub, { color: colors.muted }]}>{`Admin ${item.admin?.name ?? item.admin?.email ?? ''}`}</Text>
+                {item.details && <Text style={[styles.itemSub, { color: colors.muted }]} numberOfLines={2}>{JSON.stringify(item.details)}</Text>}
+              </View>
+            </View>
+          )} contentContainerStyle={styles.list} />
+          {(logsHasMore || logsPage > 0) && (
+            <View style={styles.paginationRow}>
+              <TouchableOpacity style={[styles.pageButton, { borderColor: colors.border }]} disabled={logsPage === 0} onPress={() => { const next = Math.max(0, logsPage - 1); setLogsPage(next); loadAdminLogs() }}>
+                <Ionicons name="chevron-back" size={16} color={colors.text} />
+                <Text style={[styles.pageButtonText, { color: colors.text }]}>Prev</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.pageButton, { borderColor: colors.border }]} disabled={!logsHasMore} onPress={() => { const next = logsPage + 1; setLogsPage(next); loadAdminLogs({ append: true }) }}>
+                <Text style={[styles.pageButtonText, { color: colors.text }]}>Next</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
     </SafeAreaView>
@@ -601,6 +816,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  chartRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  chartCard: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'stretch',
+  },
+  chartBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 50,
+    marginTop: 8,
+  },
+  chartBar: {
+    width: 10,
+    marginRight: 6,
+    backgroundColor: '#6366F1',
+    borderRadius: 4,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -678,6 +917,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexWrap: 'wrap',
   },
+  detailsBox: {
+    marginTop: 8,
+    width: '100%',
+  },
+  detailsText: {
+    fontSize: 12,
+  },
   itemTitle: {
     fontSize: 16,
     fontWeight: '500',
@@ -689,6 +935,9 @@ const styles = StyleSheet.create({
   verifyButton: {
     padding: 8,
     borderRadius: 8,
+  },
+  expandButton: {
+    padding: 8,
   },
   removeButton: {
     padding: 8,
@@ -727,6 +976,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
+  toolbarScroll: {
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  toolbarTabsBar: {
+    borderBottomWidth: 1,
+    marginBottom: 8,
+  },
+  toolbarTabsScroll: {
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  toolbarTabItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  toolbarTabItemActive: {
+    borderBottomColor: '#6366F1',
+  },
+  toolbarTabItemText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  toolbarTabItemTextActive: {
+    color: '#1E293B',
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.2)',
@@ -739,6 +1018,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
+  },
+  recipientInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
   },
   modalItem: {
     flexDirection: 'row',
