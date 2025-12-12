@@ -25,6 +25,7 @@ import {
   createProduct,
   deleteProduct,
   updateProduct,
+  getProductById,
   searchSellerProducts,
   type ProductSummary,
 } from '../services/productService';
@@ -232,7 +233,7 @@ const SellScreen = () => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [user?.id, title, description, price, selectedCategory, condition, images, resetForm]);
+  }, [user?.id, title, description, price, selectedCategory, condition, images, availableQuantity, resetForm]);
 
   const openEdit = useCallback((item: ProductSummary) => {
     setEditingItem(item);
@@ -274,19 +275,27 @@ const SellScreen = () => {
       if (ensured.error) {
         Alert.alert('Image Upload Error', ensured.error);
       }
-      const result = await updateProduct(
-        {
-          id: editingItem.id,
-          title: title.trim(),
-          description: description.trim(),
-          price: parsedPrice,
-          category: selectedCategory,
-          condition: condition as any,
-          available_quantity: Math.max(0, Number(availableQuantity)),
-          images: ensured.urls,
-        },
-        user.id
-      );
+      const parsedQtyEdit = Number(availableQuantity)
+      if (Number.isNaN(parsedQtyEdit) || parsedQtyEdit < 0) {
+        Alert.alert('Validation Error', 'Please enter a valid quantity (0 or more).');
+        setIsSubmitting(false);
+        return;
+      }
+      const newQty = Math.floor(parsedQtyEdit)
+      const arraysEqual = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i])
+      const imagesFinal = arraysEqual(ensured.urls ?? [], editingItem.images ?? []) ? (editingItem.images ?? []) : (ensured.urls ?? [])
+      const payloadToSend = {
+        id: editingItem.id,
+        title: title.trim(),
+        description: description.trim(),
+        price: parsedPrice,
+        category: selectedCategory,
+        condition: condition as any,
+        images: imagesFinal,
+        available_quantity: newQty,
+      }
+      console.log('[SellScreen] update payload', { payload: payloadToSend, userId: user.id })
+      const result = await updateProduct(payloadToSend, user.id);
 
       if (result.error) {
         Alert.alert('Error', result.error);
@@ -294,9 +303,16 @@ const SellScreen = () => {
         return;
       }
 
+      console.log('[SellScreen] update response', { error: result.error, data: result.data })
       const updated = result.data;
       if (updated) {
-        setListings((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+        const fresh = await getProductById(updated.id)
+        if (!fresh.error && fresh.data) {
+          console.log('[SellScreen] post-update refetch', { data: fresh.data })
+          setListings((prev) => prev.map((l) => (l.id === updated.id ? fresh.data! : l)));
+        } else {
+          setListings((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+        }
       }
 
       Alert.alert('Success', 'Your listing has been updated.');
@@ -308,7 +324,7 @@ const SellScreen = () => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [user?.id, editingItem, title, description, price, selectedCategory, condition, images, resetForm]);
+  }, [user?.id, editingItem, title, description, price, selectedCategory, condition, images, availableQuantity, resetForm]);
 
   const handleDeleteListing = useCallback(
     (id: string) => {

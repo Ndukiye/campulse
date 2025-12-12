@@ -15,7 +15,9 @@ export type ProductSummary = {
 };
 
 function missingQtyColumn(err?: string | null) {
-  return !!err && /available_quantity/.test(err)
+  if (!err) return false
+  const e = String(err)
+  return /available_quantity/i.test(e) && /(does not exist|undefined column|not found)/i.test(e)
 }
 
 export async function countProductsBySeller(sellerId: string) {
@@ -271,15 +273,19 @@ export async function searchProducts(filters: ProductSearchFilters) {
 }
 
 export async function createProduct(payload: ProductsInsert) {
+  const normalized: any = { ...payload }
+  if (normalized.available_quantity !== undefined && normalized.available_quantity !== null) {
+    normalized.available_quantity = Math.floor(Number(normalized.available_quantity))
+  }
   const res = await supabase
     .from('products')
-    .insert(payload)
+    .insert(normalized)
     .select('id,seller_id,title,description,price,available_quantity,images,created_at,condition,category')
     .single();
   let data: any = res.data
   let error = res.error
   if (missingQtyColumn(error ? error.message : null)) {
-    const { available_quantity, ...rest } = payload as any
+    const { available_quantity, ...rest } = normalized as any
     const r2 = await supabase
       .from('products')
       .insert(rest)
@@ -321,17 +327,23 @@ export async function deleteProduct(productId: string, sellerId: string) {
 }
 
 export async function updateProduct(payload: ProductsUpdate, sellerId: string) {
+  const normalized: any = { ...payload }
+  if (normalized.available_quantity !== undefined && normalized.available_quantity !== null) {
+    normalized.available_quantity = Math.floor(Number(normalized.available_quantity))
+  }
+  console.log('[productService] update request', { payload: normalized, sellerId })
   const res = await supabase
     .from('products')
-    .update(payload)
+    .update(normalized)
     .eq('id', payload.id)
     .eq('seller_id', sellerId)
     .select('id,seller_id,title,description,price,available_quantity,images,created_at,condition,category')
     .single();
   let data: any = res.data
   let error = res.error
+  console.log('[productService] update response', { error: error ? error.message : null, data })
   if (missingQtyColumn(error ? error.message : null)) {
-    const { available_quantity, ...rest } = payload as any
+    const { available_quantity, ...rest } = normalized as any
     const r2 = await supabase
       .from('products')
       .update(rest)
@@ -341,6 +353,23 @@ export async function updateProduct(payload: ProductsUpdate, sellerId: string) {
       .single()
     data = r2.data
     error = r2.error ?? { message: 'Stock quantity not saved: missing available_quantity column' } as any
+    console.log('[productService] update fallback response', { error: error ? (error as any).message ?? String(error) : null, data })
+  }
+  if (!error && normalized.available_quantity !== undefined && normalized.available_quantity !== null) {
+    const desired = Number(normalized.available_quantity)
+    const current = data?.available_quantity !== undefined && data?.available_quantity !== null ? Number(data.available_quantity) : null
+    if (current === null || current !== desired) {
+      const r3 = await supabase
+        .from('products')
+        .update({ available_quantity: desired })
+        .eq('id', payload.id)
+        .eq('seller_id', sellerId)
+        .select('id,seller_id,title,description,price,available_quantity,images,created_at,condition,category')
+        .single()
+      data = r3.data ?? data
+      error = r3.error ?? error
+      console.log('[productService] update quantity-only response', { error: r3.error ? r3.error.message : null, data: r3.data })
+    }
   }
 
   return {
