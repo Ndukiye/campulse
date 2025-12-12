@@ -593,6 +593,12 @@ const SellScreen = () => {
                 </ScrollView>
               )}
             </View>
+            <View style={styles.infoNotice}>
+              <Ionicons name="information-circle-outline" size={16} color="#64748B" />
+              <Text style={styles.infoNoticeText}>
+                Payments are held in escrow. A 3% transaction fee is deducted from the seller payout after successful delivery confirmation. Delivery is handled by buyer and seller directly.
+              </Text>
+            </View>
 
             <TouchableOpacity 
               style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
@@ -851,6 +857,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     marginBottom: 12,
+  },
+  infoNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 12,
+    gap: 8,
+  },
+  infoNoticeText: {
+    fontSize: 12,
+    color: '#64748B',
+    flex: 1,
   },
   listingActions: {
     flexDirection: 'row',

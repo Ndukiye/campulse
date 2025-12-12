@@ -72,7 +72,7 @@ export default function CartScreen() {
 
       <View style={[styles.notice, { backgroundColor: colors.card, borderColor: colors.border }]}> 
         <Ionicons name="information-circle-outline" size={16} color={colors.muted} />
-        <Text style={[styles.noticeText, { color: colors.muted, marginLeft: 8 }]}>Items may be from different sellers. Coordinate delivery via chat. Stock is limited.</Text>
+        <Text style={[styles.noticeText, { color: colors.muted, marginLeft: 8 }]}>Items may be from different sellers. Delivery is handled by buyer and seller directly. CamPulse does not provide delivery.</Text>
       </View>
 
       <FlatList

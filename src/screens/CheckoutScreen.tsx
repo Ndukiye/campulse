@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, SafeAreaView, TouchableOpacity, FlatList, Alert, StyleSheet, Image, Platform } from 'react-native'
+import { View, Text, SafeAreaView, TouchableOpacity, FlatList, Alert, StyleSheet, Image, Platform, Linking } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useThemeMode } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 import { listCartItems } from '../services/cartService'
-import { checkoutCart, checkoutSingle } from '../services/orderService'
+import { checkoutCartPaystack, checkoutSingle } from '../services/orderService'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import { RootStackNavigationProp, RootStackParamList } from '../types/navigation'
 import { getProductById } from '../services/productService'
@@ -42,10 +42,10 @@ export default function CheckoutScreen() {
     Alert.alert('Confirm Order', 'Place this order?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Place', style: 'destructive', onPress: async () => {
-        const r = productId ? await checkoutSingle(user.id, productId) : await checkoutCart(user.id)
+        const r = productId ? await checkoutSingle(user.id, productId) : await checkoutCartPaystack(user.id)
         if (r.error) Alert.alert('Checkout', r.error)
         else {
-          Alert.alert('Order', 'Order placed. Sellers will be notified.')
+          Alert.alert('Payment', 'Opening Paystack for secure payment')
           nav.goBack()
         }
       } },
@@ -88,6 +88,12 @@ export default function CheckoutScreen() {
           <Text style={[styles.totalLabel, { color: colors.muted }]}>Subtotal</Text>
           <Text style={[styles.totalValue, { color: colors.text }]}>₦{subtotal.toLocaleString()}</Text>
         </View>
+        <View style={[styles.notice, { borderColor: colors.border }]}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.muted} />
+          <Text style={[styles.noticeText, { color: colors.muted }]}>
+            Delivery is handled by buyer and seller directly. CamPulse does not provide delivery.
+          </Text>
+        </View>
         <TouchableOpacity style={styles.checkoutBtn} onPress={placeOrder}>
           <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
           <Text style={styles.checkoutText}>Place Order</Text>
@@ -113,4 +119,6 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 16, fontWeight: '700' },
   checkoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#10B981', paddingVertical: 12, borderRadius: 10 },
   checkoutText: { color: '#fff', fontWeight: '600', marginLeft: 8 },
-})
+  notice: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, marginTop: 10, padding: 10, borderRadius: 10 },
+  noticeText: { fontSize: 12, marginLeft: 8 },
+}) 
