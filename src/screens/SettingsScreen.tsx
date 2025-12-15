@@ -234,9 +234,9 @@ const SettingsScreen = () => {
                   <Text style={[styles.modalTitle, { color: colors.text }]}>Select Bank</Text>
                 </View>
                 <ScrollView style={{ maxHeight: 300 }}>
-                  {banks.map((b) => (
+                  {banks.map((b, i) => (
                     <TouchableOpacity
-                      key={b.code}
+                      key={`${b.code}-${i}`}
                       style={styles.bankItem}
                       onPress={() => { setBankCode(b.code); setShowBankPicker(false); }}
                     >

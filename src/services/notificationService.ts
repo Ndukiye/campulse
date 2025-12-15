@@ -35,20 +35,58 @@ export async function markNotificationRead(notificationId: string) {
 }
 
 export async function markAllNotificationsRead(userId: string) {
-  const { error } = await supabase
-    .from('notifications')
-    .update({ read: true })
-    .eq('user_id', userId)
-  return { error: error ? error.message : null }
+  const base =
+    (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim() ||
+    (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? '').trim()
+  if (!base) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', userId)
+    return { error: error ? error.message : null }
+  }
+  try {
+    const res = await fetch(`${base.replace(/\/+$/,'')}/api/notifications-mark-all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    })
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      return { error: t || `Mark all failed: ${res.status}` }
+    }
+    return { error: null }
+  } catch (e: any) {
+    return { error: e?.message || 'Network error' }
+  }
 }
 
 export async function markNotificationReadForUser(notificationId: string, userId: string) {
-  const { error } = await supabase
-    .from('notifications')
-    .update({ read: true })
-    .eq('id', notificationId)
-    .eq('user_id', userId)
-  return { error: error ? error.message : null }
+  const base =
+    (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim() ||
+    (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? '').trim()
+  if (!base) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId)
+    return { error: error ? error.message : null }
+  }
+  try {
+    const res = await fetch(`${base.replace(/\/+$/,'')}/api/notifications-read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, notification_id: notificationId }),
+    })
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      return { error: t || `Read failed: ${res.status}` }
+    }
+    return { error: null }
+  } catch (e: any) {
+    return { error: e?.message || 'Network error' }
+  }
 }
 
 export function subscribeToUserNotifications(

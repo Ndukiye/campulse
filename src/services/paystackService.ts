@@ -115,7 +115,16 @@ export async function listPaystackBanks() {
       return { error: text || `Fetch banks failed: ${res.status}`, data: [] }
     }
     const json = await res.json()
-    return { error: null, data: (json?.data ?? []) as Array<{ name: string, code: string }> }
+    const raw = (json?.data ?? []) as Array<{ name: string, code: string }>
+    const seen = new Set<string>()
+    const deduped: Array<{ name: string, code: string }> = []
+    for (const b of raw) {
+      const code = (b.code ?? '').trim()
+      if (!code || seen.has(code)) continue
+      seen.add(code)
+      deduped.push({ name: b.name, code })
+    }
+    return { error: null, data: deduped }
   } catch (e: any) {
     return { error: e?.message || 'Network error fetching banks', data: [] }
   }
