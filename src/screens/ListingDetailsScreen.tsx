@@ -23,6 +23,7 @@ import { getProfileById } from '../services/profileService';
 import { useAuth } from '../context/AuthContext';
 import { useThemeMode } from '../context/ThemeContext';
 import { isFavorite as checkFavorite, addFavorite, removeFavorite } from '../services/favoritesService';
+import { useToast } from '../context/ToastContext';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +33,7 @@ const ListingDetailsScreen = () => {
   const params = route.params;
   const { user } = useAuth();
   const { colors } = useThemeMode();
+  const toast = useToast();
 
   const [currentProduct, setCurrentProduct] = useState<ProductSummary | undefined>(undefined);
 
@@ -239,6 +241,7 @@ const ListingDetailsScreen = () => {
                 return;
               }
               setIsFavorite(true);
+              toast.show('Favorites', 'Saved to favorites', 'success');
             }
           }}
         >
@@ -418,7 +421,7 @@ const ListingDetailsScreen = () => {
             if (!user?.id || !currentProduct?.id) { Alert.alert('Sign in required', 'Sign in to add to cart'); return }
             const r = await addToCart(user.id, currentProduct.id, 1)
             if (r.error) Alert.alert('Cart', r.error)
-            else Alert.alert('Cart', 'Added to cart')
+            else toast.show('Cart', 'Added to cart', 'success')
           }}
         >
           <Ionicons name="cart-outline" size={20} color="#6366F1" />

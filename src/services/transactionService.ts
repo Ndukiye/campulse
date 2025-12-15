@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase';
+import { releasePaystackPayout } from './paystackService';
+import Constants from 'expo-constants';
 
 export type TransactionStatus = 'pending' | 'completed' | 'cancelled' | 'refunded';
 
@@ -12,6 +14,8 @@ export type SaleSummary = {
   buyerName: string;
   status: TransactionStatus;
   createdAt: string | null;
+  buyerConfirmed?: boolean;
+  sellerConfirmed?: boolean;
 };
 
 export type PurchaseSummary = {
@@ -24,6 +28,8 @@ export type PurchaseSummary = {
   sellerName: string;
   status: TransactionStatus;
   createdAt: string | null;
+  buyerConfirmed?: boolean;
+  sellerConfirmed?: boolean;
 };
 
 export async function countCompletedTransactionsBySeller(sellerId: string) {
@@ -61,6 +67,8 @@ export async function getSalesBySeller(sellerId: string, limit = 20) {
         amount,
         status,
         created_at,
+        buyer_confirmed,
+        seller_confirmed,
         product:product_id (
           id,
           title,
@@ -92,6 +100,8 @@ export async function getSalesBySeller(sellerId: string, limit = 20) {
       buyerName: row.buyer?.name ?? row.buyer?.email ?? 'Buyer',
       status: row.status as TransactionStatus,
       createdAt: row.created_at ?? null,
+      buyerConfirmed: !!row.buyer_confirmed,
+      sellerConfirmed: !!row.seller_confirmed,
     })) ?? [];
 
   return {
@@ -109,6 +119,8 @@ export async function getPurchasesByBuyer(buyerId: string, limit = 20) {
         amount,
         status,
         created_at,
+        buyer_confirmed,
+        seller_confirmed,
         product:product_id (
           id,
           title,
@@ -140,10 +152,88 @@ export async function getPurchasesByBuyer(buyerId: string, limit = 20) {
       sellerName: row.seller?.name ?? row.seller?.email ?? 'Seller',
       status: row.status as TransactionStatus,
       createdAt: row.created_at ?? null,
+      buyerConfirmed: !!row.buyer_confirmed,
+      sellerConfirmed: !!row.seller_confirmed,
     })) ?? [];
 
   return {
     data: mapped,
     error: error ? error.message : null,
   };
+}
+
+export async function confirmBuyerReceived(transactionId: string) {
+  const apiBase =
+    (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim() ||
+    (Constants?.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL ?? '').trim()
+  const fnBase =
+    (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? '').trim() ||
+    (Constants?.expoConfig?.extra?.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? '').trim()
+  const bases = [apiBase, fnBase].filter(Boolean) as string[]
+  if (bases.length === 0) return { data: null, error: 'Missing API base URL' }
+  const user = await supabase.auth.getUser()
+  const userId = user.data.user?.id
+  if (!userId) return { data: null, error: 'Not signed in' }
+  let lastErr = ''
+  for (const b of bases) {
+    try {
+      const res = await fetch(`${b.replace(/\/+$/,'')}/api/confirm-buyer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ transaction_id: transactionId, user_id: userId }),
+      })
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        lastErr = t || `Confirm failed: ${res.status}`
+        continue
+      }
+      const json = await res.json()
+      const row = json?.transaction
+      if (row?.buyer_confirmed && row?.seller_confirmed) {
+        await releasePaystackPayout(transactionId)
+      }
+      return { data: row, error: null }
+    } catch (e: any) {
+      lastErr = e?.message || 'Network error'
+    }
+  }
+  return { data: null, error: lastErr || 'Confirm failed' }
+}
+
+export async function confirmSellerDelivered(transactionId: string) {
+  const apiBase =
+    (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim() ||
+    (Constants?.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL ?? '').trim()
+  const fnBase =
+    (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? '').trim() ||
+    (Constants?.expoConfig?.extra?.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? '').trim()
+  const bases = [apiBase, fnBase].filter(Boolean) as string[]
+  if (bases.length === 0) return { data: null, error: 'Missing API base URL' }
+  const user = await supabase.auth.getUser()
+  const userId = user.data.user?.id
+  if (!userId) return { data: null, error: 'Not signed in' }
+  let lastErr = ''
+  for (const b of bases) {
+    try {
+      const res = await fetch(`${b.replace(/\/+$/,'')}/api/confirm-seller`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ transaction_id: transactionId, user_id: userId }),
+      })
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        lastErr = t || `Confirm failed: ${res.status}`
+        continue
+      }
+      const json = await res.json()
+      const row = json?.transaction
+      if (row?.buyer_confirmed && row?.seller_confirmed) {
+        await releasePaystackPayout(transactionId)
+      }
+      return { data: row, error: null }
+    } catch (e: any) {
+      lastErr = e?.message || 'Network error'
+    }
+  }
+  return { data: null, error: lastErr || 'Confirm failed' }
 }

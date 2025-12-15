@@ -30,7 +30,10 @@ import {
   getSalesBySeller,
   type PurchaseSummary,
   type SaleSummary,
+  confirmBuyerReceived,
+  confirmSellerDelivered,
 } from '../services/transactionService';
+import { useToast } from '../context/ToastContext';
 
 type EditableProfile = {
   name: string;
@@ -64,6 +67,7 @@ const ProfileScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>();
   const { colors, isDark } = useThemeMode();
   const { signOut, user } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<'listings' | 'sales' | 'purchases'>('listings');
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
@@ -487,10 +491,53 @@ const ProfileScreen = () => {
             {createdDate ? createdDate.toLocaleDateString() : '—'}
           </Text>
       </View>
+      <View style={styles.confirmationRow}>
+        <View style={[styles.confirmChip, item.buyerConfirmed ? styles.confirmChipActive : styles.confirmChipInactive]}>
+          <Ionicons
+            name={item.buyerConfirmed ? 'checkmark-circle' : 'time-outline'}
+            size={14}
+            color={item.buyerConfirmed ? '#059669' : '#64748B'}
+          />
+          <Text style={[styles.confirmChipText, item.buyerConfirmed ? styles.confirmChipTextActive : styles.confirmChipTextInactive]}>
+            Buyer Confirmed
+          </Text>
+        </View>
+        <View style={[styles.confirmChip, item.sellerConfirmed ? styles.confirmChipActive : styles.confirmChipInactive]}>
+          <Ionicons
+            name={item.sellerConfirmed ? 'checkmark-circle' : 'time-outline'}
+            size={14}
+            color={item.sellerConfirmed ? '#059669' : '#64748B'}
+          />
+          <Text style={[styles.confirmChipText, item.sellerConfirmed ? styles.confirmChipTextActive : styles.confirmChipTextInactive]}>
+            Seller Confirmed
+          </Text>
+        </View>
+      </View>
       <View style={styles.transactionStatus}>
           <Text style={[styles.statusText, styles[`status${item.status}`] ?? styles.statusDefault]}>
             {formatStatus(item.status)}
         </Text>
+        {item.status === 'pending' && !item.sellerConfirmed && (
+          <TouchableOpacity
+            style={styles.confirmButton}
+            onPress={async () => {
+              const r = await confirmSellerDelivered(item.id)
+              if (r.error) {
+                Alert.alert('Confirm Delivery', r.error)
+              } else {
+                toast.show('Confirm Delivery', 'Delivery confirmed. Awaiting buyer confirmation.', 'success')
+                setSales(prev => prev.map(s => s.id === item.id ? { ...s, sellerConfirmed: true } : s))
+                try {
+                  const res = await getSalesBySeller(user!.id, 20)
+                  setSales(res.data ?? [])
+                } catch {}
+              }
+            }}
+          >
+            <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+            <Text style={styles.confirmButtonText}>Confirm Delivered</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -524,10 +571,53 @@ const ProfileScreen = () => {
             {createdDate ? createdDate.toLocaleDateString() : '—'}
           </Text>
       </View>
+      <View style={styles.confirmationRow}>
+        <View style={[styles.confirmChip, item.buyerConfirmed ? styles.confirmChipActive : styles.confirmChipInactive]}>
+          <Ionicons
+            name={item.buyerConfirmed ? 'checkmark-circle' : 'time-outline'}
+            size={14}
+            color={item.buyerConfirmed ? '#059669' : '#64748B'}
+          />
+          <Text style={[styles.confirmChipText, item.buyerConfirmed ? styles.confirmChipTextActive : styles.confirmChipTextInactive]}>
+            Buyer Confirmed
+          </Text>
+        </View>
+        <View style={[styles.confirmChip, item.sellerConfirmed ? styles.confirmChipActive : styles.confirmChipInactive]}>
+          <Ionicons
+            name={item.sellerConfirmed ? 'checkmark-circle' : 'time-outline'}
+            size={14}
+            color={item.sellerConfirmed ? '#059669' : '#64748B'}
+          />
+          <Text style={[styles.confirmChipText, item.sellerConfirmed ? styles.confirmChipTextActive : styles.confirmChipTextInactive]}>
+            Seller Confirmed
+          </Text>
+        </View>
+      </View>
       <View style={styles.transactionStatus}>
           <Text style={[styles.statusText, styles[`status${item.status}`] ?? styles.statusDefault]}>
             {formatStatus(item.status)}
         </Text>
+        {item.status === 'pending' && !item.buyerConfirmed && (
+          <TouchableOpacity
+            style={styles.confirmButton}
+            onPress={async () => {
+              const r = await confirmBuyerReceived(item.id)
+              if (r.error) {
+                Alert.alert('Confirm Received', r.error)
+              } else {
+                toast.show('Confirm Received', 'Item received. Awaiting seller confirmation.', 'success')
+                setPurchases(prev => prev.map(p => p.id === item.id ? { ...p, buyerConfirmed: true } : p))
+                try {
+                  const res = await getPurchasesByBuyer(user!.id, 20)
+                  setPurchases(res.data ?? [])
+                } catch {}
+              }
+            }}
+          >
+            <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+            <Text style={styles.confirmButtonText}>Confirm Received</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -1271,6 +1361,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
   },
+  confirmationRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  confirmChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    gap: 6,
+  },
+  confirmChipActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#6EE7B7',
+  },
+  confirmChipInactive: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+  },
+  confirmChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  confirmChipTextActive: {
+    color: '#059669',
+  },
+  confirmChipTextInactive: {
+    color: '#64748B',
+  },
   transactionStatus: {
     marginTop: 8,
     alignItems: 'flex-end',
@@ -1301,6 +1425,22 @@ const styles = StyleSheet.create({
   statusDefault: {
     backgroundColor: '#E2E8F0',
     color: '#475569',
+  },
+  confirmButton: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignSelf: 'flex-end',
+    gap: 6,
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
   },
   modalContainer: {
     flex: 1,

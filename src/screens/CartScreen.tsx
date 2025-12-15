@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, SafeAreaView, TouchableOpacity, FlatList, Alert, StyleSheet, Image, Platform } from 'react-native'
+import { View, Text, SafeAreaView, TouchableOpacity, FlatList, StyleSheet, Image, Platform, Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useThemeMode } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
@@ -7,6 +7,7 @@ import { listCartItems, removeFromCart } from '../services/cartService'
 import { getProfileById } from '../services/profileService'
 import { RootStackNavigationProp } from '../types/navigation'
 import { useNavigation } from '@react-navigation/native'
+import { useToast } from '../context/ToastContext'
 
 export default function CartScreen() {
   const { colors } = useThemeMode()
@@ -15,6 +16,7 @@ export default function CartScreen() {
   const [items, setItems] = useState<any[]>([])
   const [groups, setGroups] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const toast = useToast()
 
   const load = async () => {
     if (!user?.id) return

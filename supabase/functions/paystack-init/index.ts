@@ -1,12 +1,12 @@
 // deno-lint-ignore-file no-explicit-any
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 })
   }
   try {
-    const secret = Deno.env.get("PAYSTACK_SECRET_KEY") || ""
+    const secret = (Deno as any).env.get("PAYSTACK_SECRET_KEY") || ""
     if (!secret) {
       return new Response(JSON.stringify({ error: "PAYSTACK_SECRET_KEY not set" }), { status: 500 })
     }

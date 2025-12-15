@@ -50,7 +50,7 @@ export default async function handler(req: Request): Promise<Response> {
             'Authorization': `Bearer ${serviceKey}`,
             'Prefer': 'return=representation',
           },
-          body: JSON.stringify({ status: 'paid_escrow', paystack_reference: reference }),
+          body: JSON.stringify({ status: 'pending', paystack_reference: reference }),
         })
         if (!res.ok) {
           const t = await res.text()

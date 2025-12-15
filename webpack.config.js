@@ -39,6 +39,8 @@ module.exports = async function (env, argv) {
       'process.env.EXPO_PUBLIC_SUPABASE_URL': JSON.stringify(process.env.EXPO_PUBLIC_SUPABASE_URL || ''),
       'process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''),
       'process.env.EXPO_PUBLIC_DEV_USER_ID': JSON.stringify(process.env.EXPO_PUBLIC_DEV_USER_ID || ''),
+      'process.env.EXPO_PUBLIC_API_BASE_URL': JSON.stringify(process.env.EXPO_PUBLIC_API_BASE_URL || ''),
+      'process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL': JSON.stringify(process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL || ''),
     })
   );
 

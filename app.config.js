@@ -27,6 +27,8 @@ export default {
       favicon: './assets/favicon.png'
     },
     extra: {
+      EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://campulse-navy.vercel.app',
+      EXPO_PUBLIC_FUNCTIONS_BASE_URL: process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'https://campulse-navy.vercel.app',
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       EXPO_PUBLIC_DEV_USER_ID: process.env.EXPO_PUBLIC_DEV_USER_ID,

@@ -65,28 +65,23 @@ export async function checkoutCartPaystack(userId: string) {
   if (cartErr) return { error: cartErr.message }
   const rows = items ?? []
   if (rows.length === 0) return { error: 'No items to checkout' }
-  // Group by seller and create one transaction per seller (satisfies NOT NULL constraint)
-  const bySeller: Record<string, any[]> = {}
-  for (const ci of rows) {
+  // Create one transaction per cart item to satisfy NOT NULL product_id constraint
+  const txRows = rows.map((ci: any) => {
     const sid = ci.product?.seller_id
-    if (!sid) return { error: 'Cart contains items with missing seller' }
-    bySeller[sid] = bySeller[sid] || []
-    bySeller[sid].push(ci)
-  }
-  const txRows = Object.entries(bySeller).map(([sid, items]) => {
-    const amount = items.reduce((sum: number, ci: any) => {
-      const qty = Number(ci.quantity ?? 1)
-      const price = Number(ci.product?.price ?? 0)
-      return sum + (qty * price)
-    }, 0)
+    const pid = ci.product?.id
+    if (!sid || !pid) return null
+    const qty = Number(ci.quantity ?? 1)
+    const price = Number(ci.product?.price ?? 0)
+    const amount = qty * price
     return {
       buyer_id: userId,
       seller_id: sid,
-      product_id: null,
+      product_id: pid,
       amount,
-      status: 'pending_payment'
+      status: 'pending'
     }
-  })
+  }).filter(Boolean) as any[]
+  if (txRows.length === 0) return { error: 'No valid items to checkout' }
   const { data: createdMany, error: txErr } = await supabase
     .from('transactions')
     .insert(txRows)
@@ -143,7 +138,7 @@ export async function checkoutSingle(userId: string, productId: string) {
       seller_id: row.seller_id,
       product_id: productId,
       amount,
-      status: 'pending_payment'
+      status: 'pending'
     }])
     .select('id')
     .single()

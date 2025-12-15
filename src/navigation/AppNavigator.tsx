@@ -24,6 +24,7 @@ import SellerProfileScreen from '../screens/SellerProfileScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import CartScreen from '../screens/CartScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
+import { ToastProvider } from '../context/ToastContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -116,96 +117,98 @@ const AppNavigator = () => {
   };
 
   return (
-    <NavigationContainer theme={navTheme}>
-      <Stack.Navigator 
-        screenOptions={{ 
-          headerShown: false,
-          headerTitleStyle: {
-            fontSize: 18,
-          },
-        }}
-      >
-        {!isAuthenticated ? (
-          <>
-            {console.log('[AppNavigator] Rendering AuthScreen')}
-            <Stack.Screen 
-              name="Auth" 
-              component={AuthScreen}
-              options={{ headerShown: false }}
-            />
-          </>
-        ) : (
-          <>
-            {console.log('[AppNavigator] Rendering MainTabs')}
-            <Stack.Screen 
-              name="Main" 
-              component={MainTabs}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="ListingDetails" 
-              component={ListingDetailsScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Chat" 
-              component={ChatScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Settings" 
-              component={SettingsScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Messages" 
-              component={MessagesScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Profile" 
-              component={ProfileScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="SellerProfile" 
-              component={SellerProfileScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Notifications" 
-              component={NotificationsScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="PrivacySecurity" 
-              component={PrivacySecurityScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="HelpSupport" 
-              component={HelpSupportScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="AdminDashboard" 
-              component={AdminDashboardScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Cart" 
-              component={CartScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Checkout" 
-              component={CheckoutScreen}
-              options={{ headerShown: false }}
-            />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ToastProvider>
+      <NavigationContainer theme={navTheme}>
+        <Stack.Navigator 
+          screenOptions={{ 
+            headerShown: false,
+            headerTitleStyle: {
+              fontSize: 18,
+            },
+          }}
+        >
+          {!isAuthenticated ? (
+            <>
+              {console.log('[AppNavigator] Rendering AuthScreen')}
+              <Stack.Screen 
+                name="Auth" 
+                component={AuthScreen}
+                options={{ headerShown: false }}
+              />
+            </>
+          ) : (
+            <>
+              {console.log('[AppNavigator] Rendering MainTabs')}
+              <Stack.Screen 
+                name="Main" 
+                component={MainTabs}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="ListingDetails" 
+                component={ListingDetailsScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Chat" 
+                component={ChatScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Settings" 
+                component={SettingsScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Messages" 
+                component={MessagesScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Profile" 
+                component={ProfileScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="SellerProfile" 
+                component={SellerProfileScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Notifications" 
+                component={NotificationsScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="PrivacySecurity" 
+                component={PrivacySecurityScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="HelpSupport" 
+                component={HelpSupportScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="AdminDashboard" 
+                component={AdminDashboardScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Cart" 
+                component={CartScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Checkout" 
+                component={CheckoutScreen}
+                options={{ headerShown: false }}
+              />
+            </>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </ToastProvider>
   );
 };
 

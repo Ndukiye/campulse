@@ -53,3 +53,25 @@ export async function initPaystackTransaction(payload: InitPayload) {
     return { error: e?.message || 'Network error initializing Paystack', data: null }
   }
 }
+
+export async function releasePaystackPayout(transactionId: string) {
+  const baseUrl =
+    (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim() ||
+    (Constants?.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL ?? '').trim()
+  if (!baseUrl) return { error: 'Missing API base URL. Set EXPO_PUBLIC_API_BASE_URL.', data: null }
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/+$/,'')}/api/paystack-payout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transaction_id: transactionId }),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return { error: text || `Payout failed: ${res.status}`, data: null }
+    }
+    const json = await res.json()
+    return { error: null, data: json }
+  } catch (e: any) {
+    return { error: e?.message || 'Network error releasing payout', data: null }
+  }
+}

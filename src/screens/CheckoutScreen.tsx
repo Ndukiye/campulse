@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, SafeAreaView, TouchableOpacity, FlatList, Alert, StyleSheet, Image, Platform, Linking } from 'react-native'
+import { View, Text, SafeAreaView, TouchableOpacity, FlatList, StyleSheet, Image, Platform, Linking, Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useThemeMode } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
@@ -8,6 +8,7 @@ import { checkoutCartPaystack, checkoutSingle } from '../services/orderService'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
 import { RootStackNavigationProp, RootStackParamList } from '../types/navigation'
 import { getProductById } from '../services/productService'
+import { useToast } from '../context/ToastContext'
 
 export default function CheckoutScreen() {
   const { colors } = useThemeMode()
@@ -15,6 +16,7 @@ export default function CheckoutScreen() {
   const nav = useNavigation<RootStackNavigationProp>()
   const route = useRoute<RouteProp<RootStackParamList, 'Checkout'>>()
   const productId = route.params?.productId
+  const toast = useToast()
 
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -39,17 +41,12 @@ export default function CheckoutScreen() {
 
   const placeOrder = async () => {
     if (!user?.id) { Alert.alert('Checkout', 'Sign in required'); return }
-    Alert.alert('Confirm Order', 'Place this order?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Place', style: 'destructive', onPress: async () => {
-        const r = productId ? await checkoutSingle(user.id, productId) : await checkoutCartPaystack(user.id)
-        if (r.error) Alert.alert('Checkout', r.error)
-        else {
-          Alert.alert('Payment', 'Opening Paystack for secure payment')
-          nav.goBack()
-        }
-      } },
-    ])
+    const r = productId ? await checkoutSingle(user.id, productId) : await checkoutCartPaystack(user.id)
+    if (r.error) Alert.alert('Checkout', r.error)
+    else {
+      toast.show('Payment', 'Opening Paystack for secure payment', 'info')
+      nav.goBack()
+    }
   }
 
   const renderItem = ({ item }: { item: any }) => (
