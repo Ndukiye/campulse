@@ -1,6 +1,29 @@
 import { Platform } from 'react-native'
 import Constants from 'expo-constants'
 
+const FALLBACK_BANKS: Array<{ name: string, code: string }> = [
+  { name: 'Access Bank', code: '044' },
+  { name: 'Zenith Bank', code: '057' },
+  { name: 'Guaranty Trust Bank', code: '058' },
+  { name: 'First Bank of Nigeria', code: '011' },
+  { name: 'United Bank for Africa', code: '033' },
+  { name: 'Fidelity Bank', code: '070' },
+  { name: 'Ecobank Nigeria', code: '050' },
+  { name: 'Stanbic IBTC Bank', code: '221' },
+  { name: 'Sterling Bank', code: '232' },
+  { name: 'Polaris Bank', code: '076' },
+  { name: 'Union Bank', code: '032' },
+  { name: 'Wema Bank', code: '035' },
+  { name: 'FCMB', code: '214' },
+  { name: 'Keystone Bank', code: '082' },
+  { name: 'Unity Bank', code: '215' },
+  { name: 'Jaiz Bank', code: '301' },
+  { name: 'Heritage Bank', code: '030' },
+  { name: 'SunTrust Bank', code: '100' },
+  { name: 'Providus Bank', code: '101' },
+  { name: 'Citibank Nigeria', code: '023' },
+]
+
 type InitPayload = {
   amountKobo: number
   email: string
@@ -124,6 +147,15 @@ export async function listPaystackBanks() {
       seen.add(code)
       deduped.push({ name: b.name, code })
     }
+    if (deduped.length < 20) {
+      for (const fb of FALLBACK_BANKS) {
+        const c = fb.code.trim()
+        if (!c || seen.has(c)) continue
+        seen.add(c)
+        deduped.push({ name: fb.name, code: c })
+      }
+    }
+    deduped.sort((a, b) => a.name.localeCompare(b.name))
     return { error: null, data: deduped }
   } catch (e: any) {
     return { error: e?.message || 'Network error fetching banks', data: [] }

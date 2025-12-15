@@ -283,11 +283,11 @@ const NotificationsScreen = () => {
             </View>
             <Text style={[styles.modalMessage, { color: colors.text }]}>{selected.message}</Text>
             <View style={styles.modalActions}>
-              {!selected.read && (
+              {/* {!selected.read && (
                 <TouchableOpacity onPress={async () => { await markAsRead(selected.id); }} style={[styles.modalBtn, { backgroundColor: '#6366F1' }]}>
                   <Text style={styles.modalBtnText}>Mark as read</Text>
                 </TouchableOpacity>
-              )}
+              )} */}
               <TouchableOpacity onPress={() => { setShowDetail(false); setSelected(null); }} style={[styles.modalBtn, { backgroundColor: '#F1F5F9' }]}>
                 <Text style={[styles.modalBtnText, { color: '#1E293B' }]}>Close</Text>
               </TouchableOpacity>
