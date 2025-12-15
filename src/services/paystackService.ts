@@ -102,3 +102,21 @@ export async function registerPaystackRecipient(params: { userId: string, bankCo
     return { error: e?.message || 'Network error creating recipient', data: null }
   }
 }
+
+export async function listPaystackBanks() {
+  const baseUrl =
+    (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim() ||
+    (Constants?.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL ?? '').trim()
+  if (!baseUrl) return { error: 'Missing API base URL. Set EXPO_PUBLIC_API_BASE_URL.', data: [] }
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/+$/,'')}/api/paystack-banks`)
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return { error: text || `Fetch banks failed: ${res.status}`, data: [] }
+    }
+    const json = await res.json()
+    return { error: null, data: (json?.data ?? []) as Array<{ name: string, code: string }> }
+  } catch (e: any) {
+    return { error: e?.message || 'Network error fetching banks', data: [] }
+  }
+}

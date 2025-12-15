@@ -49,6 +49,15 @@ export default async function handler(req: Request): Promise<Response> {
     if (!recipientCode) {
       return new Response(JSON.stringify({ error: 'Missing recipient code' }), { status: 400, headers: cors })
     }
+    // Try to persist recipient + human-friendly info (bank name/number) if columns exist
+    const patchPayload = {
+      paystack_recipient_code: recipientCode,
+      bank_name: undefined as any,
+      account_number: undefined as any,
+    }
+    // Optionally include fields (some databases may not have columns yet)
+    ;(patchPayload as any).bank_name = createJson?.data?.details?.bank_name ?? null
+    ;(patchPayload as any).account_number = accountNumber
     const updateRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`, {
       method: 'PATCH',
       headers: {
@@ -57,16 +66,22 @@ export default async function handler(req: Request): Promise<Response> {
         'Authorization': `Bearer ${serviceKey}`,
         'Prefer': 'return=representation',
       },
-      body: JSON.stringify({
-        paystack_recipient_code: recipientCode,
-      }),
+      body: JSON.stringify(patchPayload),
     })
     if (!updateRes.ok) {
-      const t = await updateRes.text()
-      return new Response(JSON.stringify({ error: t || `Update failed: ${updateRes.status}` }), { status: 400, headers: cors })
+      // Fallback: only set recipient code
+      await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify({ paystack_recipient_code: recipientCode }),
+      })
     }
-    const updated = await updateRes.json()
-    return new Response(JSON.stringify({ ok: true, recipient_code: recipientCode, profile: updated }), { status: 200, headers: cors })
+    return new Response(JSON.stringify({ ok: true, recipient_code: recipientCode }), { status: 200, headers: cors })
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e?.message || 'Unexpected error' }), { status: 500, headers: cors })
   }

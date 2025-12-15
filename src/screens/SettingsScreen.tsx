@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useThemeMode } from '../context/ThemeContext';
 import { TextInput } from 'react-native';
-import { registerPaystackRecipient } from '../services/paystackService';
+import { registerPaystackRecipient, listPaystackBanks } from '../services/paystackService';
 
 const SettingsScreen = () => {
   const { signOut, user } = useAuth();
@@ -26,6 +26,16 @@ const SettingsScreen = () => {
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
   const [savingRecipient, setSavingRecipient] = useState(false);
+  const [banks, setBanks] = useState<Array<{ name: string, code: string }>>([]);
+  const [showBankPicker, setShowBankPicker] = useState(false);
+
+  React.useEffect(() => {
+    const load = async () => {
+      const r = await listPaystackBanks();
+      if (!r.error) setBanks(r.data);
+    };
+    load();
+  }, []);
 
   const toggleSetting = (key: keyof typeof settings) => {
     setSettings(prev => ({
@@ -153,15 +163,16 @@ const SettingsScreen = () => {
         <View style={[styles.section, { backgroundColor: colors.card }] }>
           <Text style={styles.sectionTitle}>Payment Details</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Bank Code</Text>
-            <TextInput
-              style={styles.input}
-              value={bankCode}
-              onChangeText={setBankCode}
-              placeholder="e.g., 058 for GTBank"
-              placeholderTextColor="#94A3B8"
-              keyboardType="numeric"
-            />
+            <Text style={styles.label}>Bank</Text>
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setShowBankPicker(true)}
+            >
+              <Text style={styles.pickerButtonText}>
+                {banks.find(b => b.code === bankCode)?.name || 'Select bank'}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#64748B" />
+            </TouchableOpacity>
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Account Number</Text>
@@ -216,6 +227,31 @@ const SettingsScreen = () => {
             <Text style={styles.actionButtonText}>{savingRecipient ? 'Saving...' : 'Save Payment Details'}</Text>
             <Ionicons name="chevron-forward" size={24} color="#64748B" />
           </TouchableOpacity>
+          {showBankPicker && (
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>Select Bank</Text>
+                </View>
+                <ScrollView style={{ maxHeight: 300 }}>
+                  {banks.map((b) => (
+                    <TouchableOpacity
+                      key={b.code}
+                      style={styles.bankItem}
+                      onPress={() => { setBankCode(b.code); setShowBankPicker(false); }}
+                    >
+                      <Text style={[styles.bankName, { color: colors.text }]}>{b.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={styles.modalActions}>
+                  <TouchableOpacity onPress={() => setShowBankPicker(false)} style={[styles.modalBtn, { backgroundColor: '#F1F5F9' }]}>
+                    <Text style={[styles.modalBtnText, { color: '#1E293B' }]}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
         </View>
 
         <View style={[styles.section, styles.accountSection, { backgroundColor: colors.card }] }>
@@ -334,6 +370,65 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     borderBottomWidth: 0,
+  },
+  pickerButton: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  pickerButtonText: {
+    color: '#1E293B',
+    fontSize: 14,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    left: 0, right: 0, top: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 16,
+  },
+  modalBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  modalBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  bankItem: {
+    paddingVertical: 10,
+  },
+  bankName: {
+    fontSize: 14,
   },
   accountSection: {
     marginTop: 24,

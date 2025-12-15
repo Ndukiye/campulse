@@ -15,6 +15,9 @@ export interface ProfilesRow {
   is_admin?: boolean | null;
   rating?: number | null; // decimal(3,2)
   total_reviews?: number | null;
+  paystack_recipient_code?: string | null;
+  bank_name?: string | null;
+  account_number?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

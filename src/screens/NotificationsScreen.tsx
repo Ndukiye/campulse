@@ -178,7 +178,14 @@ const NotificationsScreen = () => {
   const renderNotification = ({ item }: { item: Notification }) => (
     <TouchableOpacity
       style={[styles.notificationItem, !item.read && styles.unreadNotification]}
-      onPress={() => { setSelected(item); setShowDetail(true); }}
+      onPress={async () => {
+        setSelected(item);
+        setShowDetail(true);
+        if (!item.read && user?.id) {
+          await markNotificationReadForUser(item.id, user.id);
+          setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
+        }
+      }}
       activeOpacity={0.7}
     >
       <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.type) + '20' }]}>
