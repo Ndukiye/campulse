@@ -59,6 +59,7 @@ const SellScreen = () => {
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showConditionPicker, setShowConditionPicker] = useState(false);
   const [availableQuantity, setAvailableQuantity] = useState('1');
+  const [estimatedNet, setEstimatedNet] = useState<number>(0);
 
   const [listings, setListings] = useState<ProductSummary[]>([]);
   const [loadingListings, setLoadingListings] = useState(true);
@@ -162,6 +163,7 @@ const SellScreen = () => {
     setDescription('');
     setPrice('');
     setAvailableQuantity('1');
+    setEstimatedNet(0);
     setCondition(CONDITION_OPTIONS[0]?.value ?? 'new');
     setImages([]);
     setSelectedCategory(APP_CATEGORIES[0]?.name ?? '');
@@ -527,11 +529,30 @@ const SellScreen = () => {
               <TextInput
                 style={styles.input}
                 value={price}
-                onChangeText={setPrice}
+                onChangeText={(v) => {
+                  setPrice(v);
+                  const p = Number(v);
+                  if (!Number.isNaN(p) && p > 0) {
+                    const platformFee = p * 0.03;
+                    const paystackFeeBase = p * 0.015;
+                    const paystackFlat = 100;
+                    const paystackFee = Math.min(paystackFeeBase + paystackFlat, 2500);
+                    const net = Math.max(0, Math.floor(p - platformFee - paystackFee));
+                    setEstimatedNet(net);
+                  } else {
+                    setEstimatedNet(0);
+                  }
+                }}
                 placeholder="Enter price"
                 placeholderTextColor="#94A3B8"
                 keyboardType="decimal-pad"
               />
+              <View style={styles.infoNotice}>
+                <Ionicons name="information-circle-outline" size={16} color="#64748B" />
+                <Text style={styles.infoNoticeText}>
+                  Estimated take-home: ₦{Number(estimatedNet ?? 0).toLocaleString()} (after platform and Paystack fees)
+                </Text>
+              </View>
             </View>
 
             <View style={styles.inputGroup}>

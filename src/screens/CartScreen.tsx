@@ -3,7 +3,7 @@ import { View, Text, SafeAreaView, TouchableOpacity, FlatList, StyleSheet, Image
 import { Ionicons } from '@expo/vector-icons'
 import { useThemeMode } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
-import { listCartItems, removeFromCart } from '../services/cartService'
+import { listCartItems, removeFromCart, updateCartQuantity } from '../services/cartService'
 import { getProfileById } from '../services/profileService'
 import { RootStackNavigationProp } from '../types/navigation'
 import { useNavigation } from '@react-navigation/native'
@@ -50,7 +50,33 @@ export default function CartScreen() {
         <Image source={{ uri: item.product?.images?.[0] ?? 'https://placehold.co/80' }} style={styles.itemImage} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={2}>{item.product?.title ?? 'Item'}</Text>
-          <Text style={[styles.itemMeta, { color: colors.muted }]}>Qty: {item.quantity} • ₦{Number(item.product?.price ?? 0).toLocaleString()}</Text>
+          <Text style={[styles.itemMeta, { color: colors.muted }]}>
+            ₦{Number(item.product?.price ?? 0).toLocaleString()}
+          </Text>
+          <View style={styles.qtyRow}>
+            <TouchableOpacity onPress={async () => {
+              const next = Math.max(1, Number(item.quantity ?? 1) - 1)
+              const r = await updateCartQuantity(user!.id, item.product.id, next)
+              if (r.error) Alert.alert('Cart', r.error)
+              else load()
+            }} style={styles.qtyBtn}>
+              <Ionicons name="remove-circle-outline" size={18} color="#6366F1" />
+            </TouchableOpacity>
+            <Text style={[styles.qtyText, { color: colors.text }]}>{item.quantity}</Text>
+            <TouchableOpacity onPress={async () => {
+              const next = Number(item.quantity ?? 1) + 1
+              const r = await updateCartQuantity(user!.id, item.product.id, next)
+              if (r.error) Alert.alert('Cart', r.error)
+              else load()
+            }} style={styles.qtyBtn}>
+              <Ionicons name="add-circle-outline" size={18} color="#6366F1" />
+            </TouchableOpacity>
+            {typeof item.product?.available_quantity === 'number' && (
+              <Text style={[styles.stockText, { color: colors.muted }]}>
+                / {item.product.available_quantity} in stock
+              </Text>
+            )}
+          </View>
         </View>
         <TouchableOpacity onPress={async () => {
           const r = await removeFromCart(user!.id, item.product.id)
@@ -123,6 +149,10 @@ const styles = StyleSheet.create({
   itemImage: { width: 48, height: 48, borderRadius: 8, marginRight: 12 },
   itemTitle: { fontSize: 15, fontWeight: '600' },
   itemMeta: { fontSize: 12 },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  qtyBtn: { paddingHorizontal: 4, paddingVertical: 2 },
+  qtyText: { fontSize: 13, fontWeight: '600', marginHorizontal: 8 },
+  stockText: { fontSize: 12, marginLeft: 8 },
 
   sellerHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   sellerName: { fontSize: 13, fontWeight: '600' },

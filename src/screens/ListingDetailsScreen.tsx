@@ -36,6 +36,7 @@ const ListingDetailsScreen = () => {
   const toast = useToast();
 
   const [currentProduct, setCurrentProduct] = useState<ProductSummary | undefined>(undefined);
+  const [quantity, setQuantity] = useState<number>(1);
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const imageCarouselRef = useRef<FlatList<any> | null>(null);
@@ -119,6 +120,16 @@ const ListingDetailsScreen = () => {
     fetchRelated();
   }, [currentProduct?.category, currentProduct?.id]);
 
+  useEffect(() => {
+    const maxQty = Math.max(0, Number(currentProduct?.available_quantity ?? 1))
+    if (maxQty === 0) {
+      setQuantity(1)
+    } else if (quantity > maxQty) {
+      setQuantity(maxQty)
+    } else if (quantity < 1) {
+      setQuantity(1)
+    }
+  }, [currentProduct?.id, currentProduct?.available_quantity])
   const comments = [
     {
       id: '1',
@@ -401,7 +412,7 @@ const ListingDetailsScreen = () => {
         )}
         keyExtractor={() => 'listing-details-content'}
         showsVerticalScrollIndicator={false}
-      />
+  />
 
       <View style={styles.actionContainer}>
         <TouchableOpacity 
@@ -415,17 +426,40 @@ const ListingDetailsScreen = () => {
           <Ionicons name="chatbubble-outline" size={20} color="#6366F1" />
           <Text style={styles.messageButtonText}>Message</Text>
         </TouchableOpacity>
+        <View style={styles.quantityPicker}>
+          <TouchableOpacity
+            style={styles.qtyBtn}
+            onPress={() => {
+              setQuantity((q) => Math.max(1, q - 1));
+            }}
+          >
+            <Ionicons name="remove-circle-outline" size={22} color="#6366F1" />
+          </TouchableOpacity>
+          <Text style={styles.qtyText}>{quantity}</Text>
+          <TouchableOpacity
+            style={styles.qtyBtn}
+            onPress={() => {
+              const maxQty = Math.max(1, Number(currentProduct?.available_quantity ?? 1));
+              setQuantity((q) => Math.min(maxQty, q + 1));
+            }}
+          >
+            <Ionicons name="add-circle-outline" size={22} color="#6366F1" />
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity 
-          style={styles.messageButton}
+          style={[styles.messageButton, (Number(currentProduct?.available_quantity ?? 1) <= 0) ? { opacity: 0.6 } : null]}
           onPress={async () => {
             if (!user?.id || !currentProduct?.id) { Alert.alert('Sign in required', 'Sign in to add to cart'); return }
-            const r = await addToCart(user.id, currentProduct.id, 1)
+            if (Number(currentProduct?.available_quantity ?? 0) <= 0) { Alert.alert('Out of Stock', 'This item is currently out of stock'); return }
+            const r = await addToCart(user.id, currentProduct.id, quantity)
             if (r.error) Alert.alert('Cart', r.error)
             else toast.show('Cart', 'Added to cart', 'success')
           }}
         >
           <Ionicons name="cart-outline" size={20} color="#6366F1" />
-          <Text style={styles.messageButtonText}>Add to Cart</Text>
+          <Text style={styles.messageButtonText}>
+            {Number(currentProduct?.available_quantity ?? 1) > 0 ? 'Add to Cart' : 'Out of Stock'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -476,6 +510,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
     paddingTop: 40,
+  },
+  quantityPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginHorizontal: 8,
+  },
+  qtyBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  qtyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginHorizontal: 8,
+    color: '#1E293B',
+    minWidth: 20,
+    textAlign: 'center',
   },
   backButton: {
     padding: 4,

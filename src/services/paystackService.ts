@@ -75,3 +75,30 @@ export async function releasePaystackPayout(transactionId: string) {
     return { error: e?.message || 'Network error releasing payout', data: null }
   }
 }
+
+export async function registerPaystackRecipient(params: { userId: string, bankCode: string, accountNumber: string, accountName: string }) {
+  const baseUrl =
+    (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim() ||
+    (Constants?.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL ?? '').trim()
+  if (!baseUrl) return { error: 'Missing API base URL. Set EXPO_PUBLIC_API_BASE_URL.', data: null }
+  try {
+    const res = await fetch(`${baseUrl.replace(/\/+$/,'')}/api/paystack-recipient`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: params.userId,
+        bank_code: params.bankCode,
+        account_number: params.accountNumber,
+        account_name: params.accountName,
+      }),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return { error: text || `Recipient setup failed: ${res.status}`, data: null }
+    }
+    const json = await res.json()
+    return { error: null, data: json }
+  } catch (e: any) {
+    return { error: e?.message || 'Network error creating recipient', data: null }
+  }
+}

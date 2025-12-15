@@ -39,6 +39,7 @@ export default async function handler(req: Request): Promise<Response> {
     if (event === 'charge.success') {
       const txId = data?.metadata?.transaction_id
       const txIds: string[] = Array.isArray(data?.metadata?.cart_tx_ids) ? data.metadata.cart_tx_ids : []
+      const buyerId: string | undefined = data?.metadata?.buyer_id
       const reference = data?.reference
       if (reference && (txId || txIds.length > 0)) {
         const idFilter = txIds.length > 0 ? `in.(${txIds.join(',')})` : `eq.${txId}`
@@ -55,6 +56,19 @@ export default async function handler(req: Request): Promise<Response> {
         if (!res.ok) {
           const t = await res.text()
           throw new Error(t || `Supabase update failed: ${res.status}`)
+        }
+        if (buyerId) {
+          const del = await fetch(`${supabaseUrl}/rest/v1/cart_items?user_id=eq.${buyerId}`, {
+            method: 'DELETE',
+            headers: {
+              'apikey': serviceKey,
+              'Authorization': `Bearer ${serviceKey}`,
+            },
+          })
+          if (!del.ok) {
+            const t = await del.text()
+            throw new Error(t || `Clear cart failed: ${del.status}`)
+          }
         }
       }
     }

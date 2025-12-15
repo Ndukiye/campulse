@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useThemeMode } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { fetchNotifications, markNotificationRead, markAllNotificationsRead, subscribeToUserNotifications, type NotificationRow } from '../services/notificationService';
+import { fetchNotifications, markNotificationReadForUser, markAllNotificationsRead, subscribeToUserNotifications, clearNotifications, deleteNotificationForUser, type NotificationRow } from '../services/notificationService';
 import { RootStackNavigationProp } from '../types/navigation';
 
 type Notification = {
@@ -34,6 +34,8 @@ const NotificationsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [selected, setSelected] = useState<Notification | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
 
   const formatRelativeTime = (iso: string) => {
     const d = new Date(iso);
@@ -126,14 +128,25 @@ const NotificationsScreen = () => {
   };
 
   const markAsRead = async (id: string) => {
-    await markNotificationRead(id);
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    if (!user?.id) return;
+    const r = await markNotificationReadForUser(id, user.id);
+    if (!r.error) {
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    }
   };
 
   const markAllAsRead = async () => {
     if (!user?.id) return;
     await markAllNotificationsRead(user.id);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const clearAll = async () => {
+    if (!user?.id) return;
+    const r = await clearNotifications(user.id);
+    if (!r.error) {
+      setNotifications([]);
+    }
   };
 
   const onRefresh = useCallback(() => {
@@ -165,7 +178,7 @@ const NotificationsScreen = () => {
   const renderNotification = ({ item }: { item: Notification }) => (
     <TouchableOpacity
       style={[styles.notificationItem, !item.read && styles.unreadNotification]}
-      onPress={() => markAsRead(item.id)}
+      onPress={() => { setSelected(item); setShowDetail(true); }}
       activeOpacity={0.7}
     >
       <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.type) + '20' }]}>
@@ -176,9 +189,21 @@ const NotificationsScreen = () => {
           <Text style={styles.notificationTitle}>{item.title}</Text>
           <Text style={styles.notificationTime}>{item.time}</Text>
         </View>
-        <Text style={styles.notificationMessage}>{item.message}</Text>
+        <Text style={styles.notificationMessage} numberOfLines={1}>{item.message}</Text>
       </View>
       {!item.read && <View style={styles.unreadDot} />}
+      <TouchableOpacity
+        onPress={async () => {
+          if (!user?.id) return
+          const r = await deleteNotificationForUser(item.id, user.id)
+          if (!r.error) {
+            setNotifications(prev => prev.filter(n => n.id !== item.id))
+          }
+        }}
+        style={styles.deleteBtn}
+      >
+        <Ionicons name="trash-outline" size={20} color="#DC2626" />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -201,11 +226,18 @@ const NotificationsScreen = () => {
         <View style={styles.headerLeft}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
         </View>
-        {notifications.some(n => !n.read) && (
-          <TouchableOpacity onPress={markAllAsRead} style={[styles.markAllButton, { backgroundColor: colors.background }]}>
-            <Text style={[styles.markAllText, { color: colors.primary }]}>Mark all as read</Text>
-          </TouchableOpacity>
-        )}
+        <View style={{ flexDirection: 'row' }}>
+          {notifications.some(n => !n.read) && (
+            <TouchableOpacity onPress={markAllAsRead} style={[styles.markAllButton, { backgroundColor: colors.background, marginRight: 8 }]}>
+              <Text style={[styles.markAllText, { color: colors.primary }]}>Mark all</Text>
+            </TouchableOpacity>
+          )}
+          {notifications.length > 0 && (
+            <TouchableOpacity onPress={clearAll} style={[styles.markAllButton, { backgroundColor: colors.background }]}>
+              <Text style={[styles.markAllText, { color: '#DC2626' }]}>Clear all</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {loading ? (
@@ -234,6 +266,27 @@ const NotificationsScreen = () => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         />
+      )}
+      {showDetail && selected && (
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{selected.title}</Text>
+              <Text style={[styles.modalTime, { color: colors.muted }]}>{selected.time}</Text>
+            </View>
+            <Text style={[styles.modalMessage, { color: colors.text }]}>{selected.message}</Text>
+            <View style={styles.modalActions}>
+              {!selected.read && (
+                <TouchableOpacity onPress={async () => { await markAsRead(selected.id); }} style={[styles.modalBtn, { backgroundColor: '#6366F1' }]}>
+                  <Text style={styles.modalBtnText}>Mark as read</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => { setShowDetail(false); setSelected(null); }} style={[styles.modalBtn, { backgroundColor: '#F1F5F9' }]}>
+                <Text style={[styles.modalBtnText, { color: '#1E293B' }]}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -344,6 +397,60 @@ const NotificationsScreen = () => {
     borderRadius: 4,
     backgroundColor: '#4338CA',
     marginLeft: 8,
+  },
+  deleteBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalTime: {
+    fontSize: 12,
+  },
+  modalMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 16,
+  },
+  modalBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  modalBtnText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   emptyState: {
     flex: 1,

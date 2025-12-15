@@ -53,7 +53,8 @@ export default async function handler(req: Request): Promise<Response> {
     const profRows = await profRes.json() as Array<{ id: string, email: string, paystack_recipient_code?: string | null }>
     const seller = profRows?.[0]
     const recipientCode = seller?.paystack_recipient_code || ''
-    if (!recipientCode) {
+    const isTest = secret.startsWith('sk_test_')
+    if (!recipientCode && !isTest) {
       return new Response(JSON.stringify({ error: 'Seller recipient not set' }), { status: 400, headers: cors })
     }
     const platformFee = Math.round(amountNgn * 0.03 * 100)
@@ -61,22 +62,24 @@ export default async function handler(req: Request): Promise<Response> {
     if (amountKobo <= 0) {
       return new Response(JSON.stringify({ error: 'Invalid payout amount' }), { status: 400, headers: cors })
     }
-    const transferRes = await fetch('https://api.paystack.co/transfer', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${secret}`,
-      },
-      body: JSON.stringify({
-        source: 'balance',
-        amount: amountKobo,
-        recipient: recipientCode,
-        reason: `CamPulse order ${txId}`,
+    if (!isTest) {
+      const transferRes = await fetch('https://api.paystack.co/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${secret}`,
+        },
+        body: JSON.stringify({
+          source: 'balance',
+          amount: amountKobo,
+          recipient: recipientCode,
+          reason: `CamPulse order ${txId}`,
+        })
       })
-    })
-    const transferJson = await transferRes.json()
-    if (!transferRes.ok) {
-      return new Response(JSON.stringify({ error: transferJson?.message || 'Payout failed' }), { status: 400, headers: cors })
+      const transferJson = await transferRes.json()
+      if (!transferRes.ok) {
+        return new Response(JSON.stringify({ error: transferJson?.message || 'Payout failed' }), { status: 400, headers: cors })
+      }
     }
     const updateRes = await fetch(`${supabaseUrl}/rest/v1/transactions?id=eq.${txId}`, {
       method: 'PATCH',
@@ -98,7 +101,7 @@ export default async function handler(req: Request): Promise<Response> {
       return new Response(JSON.stringify({ error: t || `Update failed: ${updateRes.status}` }), { status: 400, headers: cors })
     }
     const updated = await updateRes.json()
-    return new Response(JSON.stringify({ ok: true, transfer: transferJson, transaction: updated }), { status: 200, headers: cors })
+    return new Response(JSON.stringify({ ok: true, transaction: updated }), { status: 200, headers: cors })
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e?.message || 'Unexpected error' }), { status: 500, headers: cors })
   }

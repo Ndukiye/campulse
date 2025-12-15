@@ -12,14 +12,20 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useThemeMode } from '../context/ThemeContext';
+import { TextInput } from 'react-native';
+import { registerPaystackRecipient } from '../services/paystackService';
 
 const SettingsScreen = () => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { isDark, toggleTheme, colors } = useThemeMode();
   const [settings, setSettings] = useState({
     locationServices: true,
     saveHistory: true,
   });
+  const [bankCode, setBankCode] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountName, setAccountName] = useState('');
+  const [savingRecipient, setSavingRecipient] = useState(false);
 
   const toggleSetting = (key: keyof typeof settings) => {
     setSettings(prev => ({
@@ -144,6 +150,74 @@ const SettingsScreen = () => {
           </TouchableOpacity>
         </View>
 
+        <View style={[styles.section, { backgroundColor: colors.card }] }>
+          <Text style={styles.sectionTitle}>Payment Details</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Bank Code</Text>
+            <TextInput
+              style={styles.input}
+              value={bankCode}
+              onChangeText={setBankCode}
+              placeholder="e.g., 058 for GTBank"
+              placeholderTextColor="#94A3B8"
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Account Number</Text>
+            <TextInput
+              style={styles.input}
+              value={accountNumber}
+              onChangeText={setAccountNumber}
+              placeholder="10-digit account number"
+              placeholderTextColor="#94A3B8"
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Account Name</Text>
+            <TextInput
+              style={styles.input}
+              value={accountName}
+              onChangeText={setAccountName}
+              placeholder="Account holder name"
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.saveButton]}
+            onPress={async () => {
+              if (!bankCode.trim() || !accountNumber.trim() || !accountName.trim()) {
+                Alert.alert('Validation', 'Please fill all payment details');
+                return;
+              }
+              try {
+                if (!user?.id) { Alert.alert('Authentication', 'Please sign in'); return }
+                setSavingRecipient(true);
+                const res = await registerPaystackRecipient({
+                  userId: user.id,
+                  bankCode,
+                  accountNumber,
+                  accountName,
+                });
+                setSavingRecipient(false);
+                if (res.error) {
+                  Alert.alert('Payment Details', res.error);
+                } else {
+                  Alert.alert('Payment Details', 'Recipient saved successfully');
+                }
+              } catch (e) {
+                setSavingRecipient(false);
+                Alert.alert('Payment Details', 'Failed to save recipient');
+              }
+            }}
+          >
+            <Ionicons name="card-outline" size={24} color="#6366F1" />
+            <Text style={styles.actionButtonText}>{savingRecipient ? 'Saving...' : 'Save Payment Details'}</Text>
+            <Ionicons name="chevron-forward" size={24} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+
         <View style={[styles.section, styles.accountSection, { backgroundColor: colors.card }] }>
           <Text style={styles.sectionTitle}>Account</Text>
           <TouchableOpacity
@@ -240,6 +314,26 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#6366F1',
     marginLeft: 12,
+  },
+  inputGroup: {
+    marginBottom: 12,
+  },
+  label: {
+    fontSize: 14,
+    color: '#1E293B',
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#1E293B',
+    backgroundColor: '#FFFFFF',
+  },
+  saveButton: {
+    borderBottomWidth: 0,
   },
   accountSection: {
     marginTop: 24,
