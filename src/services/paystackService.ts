@@ -130,15 +130,25 @@ export async function listPaystackBanks() {
   const baseUrl =
     (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').trim() ||
     (Constants?.expoConfig?.extra?.EXPO_PUBLIC_API_BASE_URL ?? '').trim()
-  if (!baseUrl) return { error: 'Missing API base URL. Set EXPO_PUBLIC_API_BASE_URL.', data: [] }
+  if (!baseUrl) {
+    const seen = new Set<string>()
+    const deduped: Array<{ name: string, code: string }> = []
+    for (const fb of FALLBACK_BANKS) {
+      const c = fb.code.trim()
+      if (!c || seen.has(c)) continue
+      seen.add(c)
+      deduped.push({ name: fb.name, code: c })
+    }
+    deduped.sort((a, b) => a.name.localeCompare(b.name))
+    return { error: 'Missing API base URL. Using fallback banks.', data: deduped }
+  }
   try {
     const res = await fetch(`${baseUrl.replace(/\/+$/,'')}/api/paystack-banks`)
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      return { error: text || `Fetch banks failed: ${res.status}`, data: [] }
+    let raw: Array<{ name: string, code: string }> = []
+    if (res.ok) {
+      const json = await res.json()
+      raw = (json?.data ?? []) as Array<{ name: string, code: string }>
     }
-    const json = await res.json()
-    const raw = (json?.data ?? []) as Array<{ name: string, code: string }>
     const seen = new Set<string>()
     const deduped: Array<{ name: string, code: string }> = []
     for (const b of raw) {
@@ -147,7 +157,7 @@ export async function listPaystackBanks() {
       seen.add(code)
       deduped.push({ name: b.name, code })
     }
-    if (deduped.length < 20) {
+    if (deduped.length < 30) {
       for (const fb of FALLBACK_BANKS) {
         const c = fb.code.trim()
         if (!c || seen.has(c)) continue
@@ -158,6 +168,15 @@ export async function listPaystackBanks() {
     deduped.sort((a, b) => a.name.localeCompare(b.name))
     return { error: null, data: deduped }
   } catch (e: any) {
-    return { error: e?.message || 'Network error fetching banks', data: [] }
+    const seen = new Set<string>()
+    const deduped: Array<{ name: string, code: string }> = []
+    for (const fb of FALLBACK_BANKS) {
+      const c = fb.code.trim()
+      if (!c || seen.has(c)) continue
+      seen.add(c)
+      deduped.push({ name: fb.name, code: c })
+    }
+    deduped.sort((a, b) => a.name.localeCompare(b.name))
+    return { error: e?.message || 'Network error fetching banks. Using fallback banks.', data: deduped }
   }
 }

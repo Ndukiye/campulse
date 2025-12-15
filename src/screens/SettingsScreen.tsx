@@ -27,7 +27,6 @@ const SettingsScreen = () => {
   const [accountName, setAccountName] = useState('');
   const [savingRecipient, setSavingRecipient] = useState(false);
   const [banks, setBanks] = useState<Array<{ name: string, code: string }>>([]);
-  const [showBankPicker, setShowBankPicker] = useState(false);
   const [bankQuery, setBankQuery] = useState('');
 
   React.useEffect(() => {
@@ -165,15 +164,41 @@ const SettingsScreen = () => {
           <Text style={styles.sectionTitle}>Payment Details</Text>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Bank</Text>
-            <TouchableOpacity
-              style={styles.pickerButton}
-              onPress={() => setShowBankPicker(true)}
-            >
-              <Text style={styles.pickerButtonText}>
-                {banks.find(b => b.code === bankCode)?.name || 'Select bank'}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#64748B" />
-            </TouchableOpacity>
+            <TextInput
+              style={styles.input}
+              value={bankQuery}
+              onChangeText={(v) => {
+                setBankQuery(v);
+                const match = banks.find(b => b.name.toLowerCase() === v.toLowerCase());
+                if (match) setBankCode(match.code);
+              }}
+              placeholder="Type bank name"
+              placeholderTextColor="#94A3B8"
+            />
+            {!!bankQuery.trim() && (
+              <View style={[styles.suggestionBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <ScrollView style={{ maxHeight: 220 }}>
+                  {banks
+                    .filter(b => b.name.toLowerCase().includes(bankQuery.toLowerCase()))
+                    .map((b) => (
+                      <TouchableOpacity
+                        key={b.code}
+                        style={[styles.suggestionRow, { borderColor: colors.border }]}
+                        onPress={() => {
+                          setBankCode(b.code);
+                          setBankQuery(b.name);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.bankName, { color: colors.text }]}>{b.name}</Text>
+                        {bankCode === b.code && (
+                          <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                </ScrollView>
+              </View>
+            )}
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Account Number</Text>
@@ -228,46 +253,7 @@ const SettingsScreen = () => {
             <Text style={styles.actionButtonText}>{savingRecipient ? 'Saving...' : 'Save Payment Details'}</Text>
             <Ionicons name="chevron-forward" size={24} color="#64748B" />
           </TouchableOpacity>
-          {showBankPicker && (
-            <View style={styles.modalOverlay}>
-              <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
-                <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { color: colors.text }]}>Select Bank</Text>
-                </View>
-                <TextInput
-                  style={[styles.searchInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.background }]}
-                  value={bankQuery}
-                  onChangeText={setBankQuery}
-                  placeholder="Search bank"
-                  placeholderTextColor={colors.muted}
-                />
-                <View style={{ maxHeight: 320 }}>
-                  <ScrollView>
-                    {banks
-                      .filter(b => b.name.toLowerCase().includes(bankQuery.toLowerCase()))
-                      .map((b) => (
-                        <TouchableOpacity
-                          key={b.code}
-                          style={[styles.bankRow, { borderColor: colors.border }]}
-                          onPress={() => { setBankCode(b.code); setShowBankPicker(false); }}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.bankName, { color: colors.text }]}>{b.name}</Text>
-                          {bankCode === b.code && (
-                            <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                  </ScrollView>
-                </View>
-                <View style={styles.modalActions}>
-                  <TouchableOpacity onPress={() => setShowBankPicker(false)} style={[styles.modalBtn, { backgroundColor: '#F1F5F9' }]}>
-                    <Text style={[styles.modalBtnText, { color: '#1E293B' }]}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          )}
+          
         </View>
 
         <View style={[styles.section, styles.accountSection, { backgroundColor: colors.card }] }>
@@ -453,12 +439,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  searchInput: {
+  suggestionBox: {
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 10,
-    marginBottom: 8,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
   },
   accountSection: {
     marginTop: 24,
