@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackNavigationProp, RootStackParamList } from '../types/navigation';
 import { getProductById, searchProducts, type ProductSummary } from '../services/productService';
 import { addToCart } from '../services/cartService';
@@ -24,13 +25,16 @@ import { useAuth } from '../context/AuthContext';
 import { useThemeMode } from '../context/ThemeContext';
 import { isFavorite as checkFavorite, addFavorite, removeFavorite } from '../services/favoritesService';
 import { useToast } from '../context/ToastContext';
-import { listProductReviews } from '../services/reviewService';
+import { listProductReviews, deleteProductReview } from '../services/reviewService';
 
-const { width } = Dimensions.get('window');
+  const { width } = Dimensions.get('window');
 
-const ListingDetailsScreen = () => {
-  const navigation = useNavigation<RootStackNavigationProp>();
-  const route = useRoute<RouteProp<RootStackParamList, 'ListingDetails'>>();
+  // Add navigation prop type
+  type ListingDetailsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'ListingDetails'>;
+
+  export default function ListingDetailsScreen() {
+    const navigation = useNavigation<ListingDetailsScreenNavigationProp>();
+    const route = useRoute<RouteProp<RootStackParamList, 'ListingDetails'>>();
   const params = route.params;
   const { user } = useAuth();
   const { colors } = useThemeMode();
@@ -47,6 +51,16 @@ const ListingDetailsScreen = () => {
   const [sellerProfile, setSellerProfile] = useState<ProfilesRow | null>(null);
   const [sellerLoading, setSellerLoading] = useState(false);
   const [sellerError, setSellerError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user?.id) { setIsAdmin(false); return; }
+      const res = await getProfileById(user.id);
+      setIsAdmin(!!res.data?.is_admin);
+    };
+    checkAdmin();
+  }, [user?.id]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -168,6 +182,21 @@ const ListingDetailsScreen = () => {
     <Image source={{ uri: item.url }} style={styles.productImage} />
   );
 
+  const handleDeleteReview = async (reviewId: string) => {
+    Alert.alert('Delete Review', 'Are you sure you want to delete this review?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        const res = await deleteProductReview(reviewId);
+        if (res.error) {
+          Alert.alert('Error', res.error);
+        } else {
+          setProductReviews(prev => prev.filter(r => r.id !== reviewId));
+          toast.show('Review Deleted', 'The review has been removed.', 'success');
+        }
+      }}
+    ]);
+  };
+
   const renderRelatedItem = ({ item }: { item: ProductSummary }) => (
     <TouchableOpacity
       style={styles.relatedItemCard}
@@ -198,6 +227,11 @@ const ListingDetailsScreen = () => {
             </View>
           </View>
         </View>
+        {isAdmin && (
+          <TouchableOpacity onPress={() => handleDeleteReview(item.id)} style={{ padding: 4 }}>
+            <Ionicons name="trash-outline" size={20} color={colors.danger} />
+          </TouchableOpacity>
+        )}
       </View>
       <View style={styles.commentContent}>
         <Text style={styles.commentText}>{item.comment}</Text>
@@ -399,6 +433,29 @@ const ListingDetailsScreen = () => {
                 <Text style={[styles.locationText, { color: colors.muted }]}>{sellerProfile?.location ?? '—'}</Text>
               </View>
             </View>
+
+            {/* Report Listing Button */}
+            <TouchableOpacity 
+              style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                padding: 16, 
+                backgroundColor: colors.card,
+                marginTop: 12,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 8
+              }}
+              onPress={() => {
+                if (currentProduct?.id) {
+                  navigation.navigate('Report', { type: 'listing', targetId: currentProduct.id, initialData: { listing: currentProduct } });
+                }
+              }}
+            >
+              <Ionicons name="flag-outline" size={20} color={colors.danger} style={{ marginRight: 8 }} />
+              <Text style={{ color: colors.danger, fontWeight: '600' }}>Report this Listing</Text>
+            </TouchableOpacity>
             
             {comments.length > 0 && (
               <View style={[styles.commentsSection, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
@@ -932,5 +989,3 @@ const styles = StyleSheet.create({
     color: '#6366F1',
   },
 });
-
-export default ListingDetailsScreen;

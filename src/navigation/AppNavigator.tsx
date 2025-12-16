@@ -29,6 +29,8 @@ import CheckoutScreen from '../screens/CheckoutScreen';
 import { ToastProvider } from '../context/ToastContext';
 
 import TransactionHistoryScreen from '../screens/TransactionHistoryScreen';
+import ReportScreen from '../screens/ReportScreen';
+import DisputeScreen from '../screens/DisputeScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -221,6 +223,16 @@ const AppNavigator = () => {
               <Stack.Screen 
                 name="TransactionHistory" 
                 component={TransactionHistoryScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Report" 
+                component={ReportScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="Dispute" 
+                component={DisputeScreen}
                 options={{ headerShown: false }}
               />
             </>

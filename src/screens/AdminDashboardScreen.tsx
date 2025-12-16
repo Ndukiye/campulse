@@ -8,6 +8,8 @@ import { useThemeMode } from '../context/ThemeContext'
 import { searchProducts, type ProductSummary, deleteProduct } from '../services/productService'
 import { getProfileById, updateProfile } from '../services/profileService'
 import { fetchNotifications } from '../services/notificationService'
+import { getReports, updateReportStatus } from '../services/reportService'
+import { getDisputes, updateDisputeStatus } from '../services/disputeService'
 import { supabase } from '../lib/supabase'
 import { APP_CATEGORIES } from '../constants/categories'
 
@@ -28,7 +30,7 @@ const AdminDashboardScreen = () => {
   const { colors } = useThemeMode()
   const { user } = useAuth()
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'products' | 'transactions' | 'notifications' | 'logs'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'products' | 'transactions' | 'notifications' | 'logs' | 'reports' | 'disputes'>('overview')
   const [loading, setLoading] = useState(false)
 
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -83,6 +85,9 @@ const AdminDashboardScreen = () => {
   const [txPageSize] = useState(20)
   const [txHasMore, setTxHasMore] = useState(false)
   const [txStatus, setTxStatus] = useState<'all' | 'pending' | 'completed' | 'cancelled' | 'refunded'>('all')
+
+  const [reports, setReports] = useState<any[]>([])
+  const [disputes, setDisputes] = useState<any[]>([])
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -197,6 +202,32 @@ const AdminDashboardScreen = () => {
       }
     }
   }, [showRecipientModal])
+
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      const loadReports = async () => {
+        setLoading(true);
+        const { data, error } = await getReports();
+        if (error) Alert.alert('Error', error);
+        else setReports(data || []);
+        setLoading(false);
+      };
+      loadReports();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'disputes') {
+      const loadDisputes = async () => {
+        setLoading(true);
+        const { data, error } = await getDisputes();
+        if (error) Alert.alert('Error', error);
+        else setDisputes(data || []);
+        setLoading(false);
+      };
+      loadDisputes();
+    }
+  }, [activeTab]);
 
   const loadUsers = async (opts?: { append?: boolean }) => {
     setLoading(true)
@@ -415,6 +446,8 @@ const AdminDashboardScreen = () => {
             { key: 'transactions', label: 'Transactions' },
             { key: 'notifications', label: 'Notifications' },
             { key: 'logs', label: 'Logs' },
+            { key: 'reports', label: 'Reports' },
+            { key: 'disputes', label: 'Disputes' },
           ] as const).map(t => (
             <TouchableOpacity key={t.key} style={[styles.tabItem, activeTab === t.key && styles.tabItemActive]} onPress={() => setActiveTab(t.key)}>
               <Text style={[styles.tabItemText, activeTab === t.key && styles.tabItemTextActive]}>{t.label}</Text>
@@ -750,6 +783,107 @@ const AdminDashboardScreen = () => {
           )}
         </View>
       )}
+
+      {activeTab === 'reports' && (
+        <FlatList
+          data={reports}
+          keyExtractor={(r) => r.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <View style={[styles.listItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.text }]}>{item.reason}</Text>
+                <Text style={[styles.itemSub, { color: colors.muted }]}>Status: {item.status}</Text>
+                <Text style={[styles.itemSub, { color: colors.muted }]}>Details: {item.details}</Text>
+                <Text style={[styles.itemSub, { color: colors.muted }]}>
+                  Reporter: {item.reporter?.name || item.reporter?.email}
+                </Text>
+                {item.reported && (
+                  <Text style={[styles.itemSub, { color: colors.muted }]}>
+                    Reported User: {item.reported.name || item.reported.email}
+                  </Text>
+                )}
+                {item.listing && (
+                  <Text style={[styles.itemSub, { color: colors.muted }]}>
+                    Listing: {item.listing.title}
+                  </Text>
+                )}
+              </View>
+              <View>
+                 {item.status === 'pending' && (
+                   <TouchableOpacity 
+                     style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                     onPress={async () => {
+                       await updateReportStatus(item.id, 'resolved');
+                       setReports(prev => prev.map(r => r.id === item.id ? { ...r, status: 'resolved' } : r));
+                     }}
+                   >
+                     <Text style={styles.actionButtonText}>Resolve</Text>
+                   </TouchableOpacity>
+                 )}
+                 {item.status === 'pending' && (
+                   <TouchableOpacity 
+                     style={[styles.actionButton, { backgroundColor: colors.muted, marginTop: 4 }]}
+                     onPress={async () => {
+                       await updateReportStatus(item.id, 'dismissed');
+                       setReports(prev => prev.map(r => r.id === item.id ? { ...r, status: 'dismissed' } : r));
+                     }}
+                   >
+                     <Text style={styles.actionButtonText}>Dismiss</Text>
+                   </TouchableOpacity>
+                 )}
+              </View>
+            </View>
+          )}
+        />
+      )}
+
+      {activeTab === 'disputes' && (
+        <FlatList
+          data={disputes}
+          keyExtractor={(d) => d.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <View style={[styles.listItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.itemTitle, { color: colors.text }]}>{item.reason}</Text>
+                <Text style={[styles.itemSub, { color: colors.muted }]}>Status: {item.status}</Text>
+                <Text style={[styles.itemSub, { color: colors.muted }]}>Desc: {item.description}</Text>
+                <Text style={[styles.itemSub, { color: colors.muted }]}>
+                  Opener: {item.opener?.name || item.opener?.email}
+                </Text>
+                <Text style={[styles.itemSub, { color: colors.muted }]}>
+                  Tx: {item.transaction?.product?.title} (₦{item.transaction?.amount})
+                </Text>
+              </View>
+              <View>
+                 {item.status === 'open' && (
+                   <TouchableOpacity 
+                     style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                     onPress={async () => {
+                       await updateDisputeStatus(item.id, 'resolved_refunded');
+                       setDisputes(prev => prev.map(d => d.id === item.id ? { ...d, status: 'resolved_refunded' } : d));
+                     }}
+                   >
+                     <Text style={styles.actionButtonText}>Refund</Text>
+                   </TouchableOpacity>
+                 )}
+                 {item.status === 'open' && (
+                   <TouchableOpacity 
+                     style={[styles.actionButton, { backgroundColor: colors.muted, marginTop: 4 }]}
+                     onPress={async () => {
+                       await updateDisputeStatus(item.id, 'resolved_dismissed');
+                       setDisputes(prev => prev.map(d => d.id === item.id ? { ...d, status: 'resolved_dismissed' } : d));
+                     }}
+                   >
+                     <Text style={styles.actionButtonText}>Dismiss</Text>
+                   </TouchableOpacity>
+                 )}
+              </View>
+            </View>
+          )}
+        />
+      )}
     </SafeAreaView>
   )
 }
@@ -1039,6 +1173,18 @@ const styles = StyleSheet.create({
   modalClose: {
     marginTop: 8,
     alignSelf: 'flex-end',
+  },
+  actionButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
 })
 

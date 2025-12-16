@@ -171,11 +171,18 @@ const SellerProfileScreen = () => {
               </View>
               <View style={styles.actionsRow}>
                 <TouchableOpacity
-                  style={[styles.messageButton, { borderColor: colors.primary }]}
+                  style={[styles.messageButton, { borderColor: colors.primary, flex: 1 }]}
                   onPress={() => navigation.navigate('Chat', { userId: sellerId })}
                 >
                   <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
-                  <Text style={[styles.messageButtonText, { color: colors.primary }]}>Message Seller</Text>
+                  <Text style={[styles.messageButtonText, { color: colors.primary }]}>Message</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.messageButton, { borderColor: colors.danger, marginLeft: 12, flex: 1 }]}
+                  onPress={() => navigation.navigate('Report', { type: 'user', targetId: sellerId })}
+                >
+                  <Ionicons name="flag-outline" size={20} color={colors.danger} />
+                  <Text style={[styles.messageButtonText, { color: colors.danger }]}>Report</Text>
                 </TouchableOpacity>
               </View>
             </View>

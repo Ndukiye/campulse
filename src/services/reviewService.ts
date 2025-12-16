@@ -66,3 +66,14 @@ export async function listProductReviews(productId: string, limit = 20) {
     error: error ? error.message : null,
   }
 }
+
+export async function deleteProductReview(reviewId: string) {
+  const { error } = await supabase
+    .from('product_reviews')
+    .delete()
+    .eq('id', reviewId)
+
+  return {
+    error: error ? error.message : null,
+  }
+}

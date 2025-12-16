@@ -274,6 +274,24 @@ export default function TransactionHistoryScreen() {
               <Text style={[styles.addReviewButtonText, { color: colors.primary }]}>Add Review</Text>
             </TouchableOpacity>
           )}
+          {item.status !== 'refunded' && item.status !== 'cancelled' && (
+             <TouchableOpacity
+               style={{ 
+                 flexDirection: 'row', 
+                 alignItems: 'center', 
+                 justifyContent: 'center',
+                 padding: 8,
+                 marginTop: 8,
+                 borderWidth: 1,
+                 borderColor: colors.danger,
+                 borderRadius: 8
+               }}
+               onPress={() => navigation.navigate('Dispute', { transactionId: item.id })}
+             >
+               <Ionicons name="alert-circle-outline" size={16} color={colors.danger} style={{ marginRight: 6 }} />
+               <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600' }}>Report Issue</Text>
+             </TouchableOpacity>
+          )}
         </View>
       </View>
     );
