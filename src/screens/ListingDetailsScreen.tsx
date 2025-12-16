@@ -50,7 +50,17 @@ const ListingDetailsScreen = () => {
 
   useEffect(() => {
     const fetchProduct = async () => {
-      if (params?.listingId) {
+      if (params?.product) {
+        // Use passed product data immediately
+        setCurrentProduct(params.product as any);
+        setIsLoading(false);
+        // Optionally fetch fresh data in background if needed
+        if (params.product.id) {
+           getProductById(params.product.id).then(res => {
+             if (res.data) setCurrentProduct(res.data);
+           });
+        }
+      } else if (params?.listingId) {
         setIsLoading(true);
         const res = await getProductById(params.listingId);
         if (res.error) {
@@ -63,7 +73,7 @@ const ListingDetailsScreen = () => {
       }
     };
     fetchProduct();
-  }, [params?.listingId]);
+  }, [params?.listingId, params?.product]);
 
   useEffect(() => {
     const checkFav = async () => {

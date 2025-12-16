@@ -21,11 +21,14 @@ import AuthScreen from '../screens/AuthScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import PrivacySecurityScreen from '../screens/PrivacySecurityScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
+import FavoritesScreen from '../screens/FavoritesScreen';
 import SellerProfileScreen from '../screens/SellerProfileScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import CartScreen from '../screens/CartScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import { ToastProvider } from '../context/ToastContext';
+
+import TransactionHistoryScreen from '../screens/TransactionHistoryScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -196,6 +199,11 @@ const AppNavigator = () => {
                 options={{ headerShown: false }}
               />
               <Stack.Screen 
+                name="Favorites" 
+                component={FavoritesScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
                 name="AdminDashboard" 
                 component={AdminDashboardScreen}
                 options={{ headerShown: false }}
@@ -208,6 +216,11 @@ const AppNavigator = () => {
               <Stack.Screen 
                 name="Checkout" 
                 component={CheckoutScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen 
+                name="TransactionHistory" 
+                component={TransactionHistoryScreen}
                 options={{ headerShown: false }}
               />
             </>

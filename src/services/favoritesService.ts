@@ -54,7 +54,9 @@ export async function getFavoritesByUser(userId: string) {
           images,
           created_at,
           condition,
-          category
+          category,
+          seller_id,
+          available_quantity
         )
       `
     )

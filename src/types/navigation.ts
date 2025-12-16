@@ -31,7 +31,9 @@ export type RootStackParamList = {
   Notifications: undefined;
   PrivacySecurity: undefined;
   HelpSupport: undefined;
+  Favorites: undefined;
   AdminDashboard: undefined;
+  TransactionHistory: { userId: string; initialTab?: 'sales' | 'purchases' };
 };
 
 export type MainTabParamList = {

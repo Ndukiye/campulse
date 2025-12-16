@@ -36,7 +36,7 @@ import {
 import { useToast } from '../context/ToastContext';
 import { registerPaystackRecipient, listPaystackBanks } from '../services/paystackService';
 import { signIn as verifyPasswordSignIn } from '../services/authService';
-import { submitSellerReview } from '../services/reviewService';
+import { submitSellerReview, submitProductReview } from '../services/reviewService';
 
 type EditableProfile = {
   name: string;
@@ -233,8 +233,8 @@ const ProfileScreen = () => {
         try {
           const [listingsRes, salesRes, purchasesRes] = await Promise.all([
             getProductsBySeller(user.id, 20),
-            getSalesBySeller(user.id, 20),
-            getPurchasesByBuyer(user.id, 20),
+            getSalesBySeller(user.id, 100, 0, 'pending'),
+            getPurchasesByBuyer(user.id, 100, 0, 'pending'),
           ]);
           if (!isMounted) return;
           setListings(listingsRes.data ?? []);
@@ -568,7 +568,7 @@ const ProfileScreen = () => {
                 toast.show('Confirm Delivery', 'Delivery confirmed. Awaiting buyer confirmation.', 'success')
                 setSales(prev => prev.map(s => s.id === item.id ? { ...s, sellerConfirmed: true } : s))
                 try {
-                  const res = await getSalesBySeller(user!.id, 20)
+                  const res = await getSalesBySeller(user!.id, 100, 0, 'pending')
                   setSales(res.data ?? [])
                 } catch {}
               }
@@ -648,7 +648,7 @@ const ProfileScreen = () => {
                 toast.show('Confirm Received', 'Item received. Awaiting seller confirmation.', 'success')
                 setPurchases(prev => prev.map(p => p.id === item.id ? { ...p, buyerConfirmed: true } : p))
                 try {
-                  const res = await getPurchasesByBuyer(user!.id, 20)
+                  const res = await getPurchasesByBuyer(user!.id, 100, 0, 'pending')
                   setPurchases(res.data ?? [])
                 } catch {}
                 setReviewContext({ sellerId: item.sellerId ?? null, productId: item.productId ?? null })
@@ -740,37 +740,57 @@ const ProfileScreen = () => {
       case 'sales':
         return (
           <View style={styles.transactionsContainer}>
-            <FlatList<SaleSummary>
-              data={sales}
-              renderItem={renderSaleItem}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.transactionsList}
-              ListEmptyComponent={
-                <View style={styles.emptyStateContainer}>
-                  <Ionicons name="trending-up-outline" size={40} color="#94A3B8" />
-                  <Text style={styles.emptyStateTitle}>No sales yet</Text>
-                  <Text style={styles.emptyStateSubtitle}>Completed sales will appear here.</Text>
-                </View>
-              }
-            />
+            <View style={sales.length > 0 ? { maxHeight: 400 } : undefined}>
+              <FlatList<SaleSummary>
+                data={sales}
+                renderItem={renderSaleItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.transactionsList}
+                nestedScrollEnabled={true}
+                ListEmptyComponent={
+                  <View style={styles.emptyStateContainer}>
+                    <Ionicons name="trending-up-outline" size={40} color="#94A3B8" />
+                    <Text style={styles.emptyStateTitle}>No pending sales</Text>
+                    <Text style={styles.emptyStateSubtitle}>Pending sales will appear here.</Text>
+                  </View>
+                }
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.viewHistoryButton}
+              onPress={() => navigation.navigate('TransactionHistory', { userId: user?.id, initialTab: 'sales' })}
+            >
+              <Text style={[styles.viewHistoryText, { color: colors.primary }]}>View Full History</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
           </View>
         );
       case 'purchases':
         return (
           <View style={styles.transactionsContainer}>
-            <FlatList<PurchaseSummary>
-              data={purchases}
-              renderItem={renderPurchaseItem}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.transactionsList}
-              ListEmptyComponent={
-                <View style={styles.emptyStateContainer}>
-                  <Ionicons name="cart-outline" size={40} color="#94A3B8" />
-                  <Text style={styles.emptyStateTitle}>No purchases yet</Text>
-                  <Text style={styles.emptyStateSubtitle}>Your purchases will appear here.</Text>
-                </View>
-              }
-            />
+            <View style={purchases.length > 0 ? { maxHeight: 400 } : undefined}>
+              <FlatList<PurchaseSummary>
+                data={purchases}
+                renderItem={renderPurchaseItem}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={styles.transactionsList}
+                nestedScrollEnabled={true}
+                ListEmptyComponent={
+                  <View style={styles.emptyStateContainer}>
+                    <Ionicons name="cart-outline" size={40} color="#94A3B8" />
+                    <Text style={styles.emptyStateTitle}>No pending purchases</Text>
+                    <Text style={styles.emptyStateSubtitle}>Pending purchases will appear here.</Text>
+                  </View>
+                }
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.viewHistoryButton}
+              onPress={() => navigation.navigate('TransactionHistory', { userId: user?.id, initialTab: 'purchases' })}
+            >
+              <Text style={[styles.viewHistoryText, { color: colors.primary }]}>View Full History</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.primary} />
+            </TouchableOpacity>
           </View>
         );
     }
@@ -1060,6 +1080,14 @@ const ProfileScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.settingItem}
+                onPress={() => navigation.navigate('Favorites')}
+              >
+                <Ionicons name="heart-outline" size={24} color={colors.text} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Favorites</Text>
+                <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.settingItem}
                 onPress={() => navigation.navigate('Settings')}
               >
                 <Ionicons name="settings-outline" size={24} color={colors.text} />
@@ -1105,6 +1133,7 @@ const ProfileScreen = () => {
 
       {renderEditProfileModal()}
       {renderVerificationModal()}
+      {renderReviewModal()}
       <Modal
         visible={showPasswordPrompt}
         animationType="fade"
@@ -1805,6 +1834,17 @@ const styles = StyleSheet.create({
   addReviewButtonText: {
     fontWeight: '600',
     fontSize: 12,
+  },
+  viewHistoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    gap: 8,
+  },
+  viewHistoryText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,

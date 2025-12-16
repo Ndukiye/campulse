@@ -58,8 +58,8 @@ export async function countCompletedTransactionsByBuyer(buyerId: string) {
   };
 }
 
-export async function getSalesBySeller(sellerId: string, limit = 20) {
-  const { data, error } = await supabase
+export async function getSalesBySeller(sellerId: string, limit = 20, offset = 0, status?: TransactionStatus) {
+  let query = supabase
     .from('transactions')
     .select(
       `
@@ -84,7 +84,13 @@ export async function getSalesBySeller(sellerId: string, limit = 20) {
     )
     .eq('seller_id', sellerId)
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  const { data, error } = await query;
 
   const mapped: SaleSummary[] =
     data?.map((row: any) => ({
@@ -110,8 +116,8 @@ export async function getSalesBySeller(sellerId: string, limit = 20) {
   };
 }
 
-export async function getPurchasesByBuyer(buyerId: string, limit = 20) {
-  const { data, error } = await supabase
+export async function getPurchasesByBuyer(buyerId: string, limit = 20, offset = 0, status?: TransactionStatus) {
+  let query = supabase
     .from('transactions')
     .select(
       `
@@ -136,7 +142,13 @@ export async function getPurchasesByBuyer(buyerId: string, limit = 20) {
     )
     .eq('buyer_id', buyerId)
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  const { data, error } = await query;
 
   const mapped: PurchaseSummary[] =
     data?.map((row: any) => ({
