@@ -663,6 +663,21 @@ const ProfileScreen = () => {
             <Text style={styles.confirmButtonText}>Confirm Received</Text>
           </TouchableOpacity>
         )}
+        {(item.productId && (item.status === 'completed' || (item.buyerConfirmed && item.sellerConfirmed))) && (
+          <TouchableOpacity
+            style={[styles.addReviewButton, { borderColor: colors.border, backgroundColor: colors.card }]}
+            onPress={() => {
+              setReviewContext({ sellerId: item.sellerId ?? null, productId: item.productId ?? null })
+              setReviewSellerRating(0)
+              setReviewProductRating(0)
+              setReviewProductComment('')
+              setShowReviewModal(true)
+            }}
+          >
+            <Ionicons name="star-outline" size={16} color={colors.primary} />
+            <Text style={[styles.addReviewButtonText, { color: colors.primary }]}>Add Review</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -1773,6 +1788,21 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  addReviewButton: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignSelf: 'flex-end',
+    gap: 6,
+    borderWidth: 1,
+  },
+  addReviewButtonText: {
     fontWeight: '600',
     fontSize: 12,
   },
