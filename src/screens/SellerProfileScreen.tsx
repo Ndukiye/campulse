@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
+import { useThemeMode } from '../context/ThemeContext'
 import { RootStackNavigationProp, RootStackParamList } from '../types/navigation'
 import type { ProfilesRow } from '../types/database'
 import { getProfileById } from '../services/profileService'
@@ -21,6 +22,7 @@ const SellerProfileScreen = () => {
   const navigation = useNavigation<RootStackNavigationProp>()
   const route = useRoute<RouteProp<RootStackParamList, 'SellerProfile'>>()
   const sellerId = route.params.userId
+  const { colors } = useThemeMode()
 
   const [profile, setProfile] = useState<ProfilesRow | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
@@ -87,19 +89,19 @@ const SellerProfileScreen = () => {
 
   if (profileLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4338CA" />
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     )
   }
 
   if (profileError || !profile) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <Ionicons name="alert-circle-outline" size={40} color="#DC2626" />
-        <Text style={styles.errorText}>{profileError ?? 'Seller profile not found'}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.retryText}>Go Back</Text>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <Ionicons name="alert-circle-outline" size={40} color={colors.danger} />
+        <Text style={[styles.errorText, { color: colors.text }]}>{profileError ?? 'Seller profile not found'}</Text>
+        <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={() => navigation.goBack()}>
+          <Text style={[styles.retryText, { color: '#FFFFFF' }]}>Go Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
     )
@@ -110,84 +112,94 @@ const SellerProfileScreen = () => {
     const priceValue = item.price ?? 0
     return (
       <TouchableOpacity
-        style={styles.listingCard}
+        style={[styles.listingCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={() => navigation.navigate('ListingDetails', { listingId: item.id })}
       >
-        <Image source={{ uri: imageUrl }} style={styles.listingImage} />
-        <View style={styles.listingInfo}>
-          <Text style={styles.listingTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.listingPrice}>₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+        <Image source={{ uri: imageUrl }} style={[styles.listingImage, { backgroundColor: colors.surface }]} />
+        <View style={[styles.listingInfo, { backgroundColor: colors.card }]}>
+          <Text style={[styles.listingTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
+          <Text style={[styles.listingPrice, { color: colors.primary }]}>₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
         </View>
       </TouchableOpacity>
     )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.topBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.topBarTitle, { color: colors.text }]}>Seller Profile</Text>
+        <View style={styles.placeholder} />
+      </View>
       <FlatList
         data={[1]}
         renderItem={() => (
           <>
-            <View style={styles.header}>
+            <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
               <View style={styles.avatarContainer}>
-                <Image source={{ uri: displayAvatar }} style={styles.avatar} />
+                <Image source={{ uri: displayAvatar }} style={[styles.avatar, { borderColor: colors.card }]} />
                 {isVerified && (
-                  <View style={styles.verifiedBadge}>
-                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  <View style={[styles.verifiedBadge, { backgroundColor: colors.card }]}>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
                   </View>
                 )}
               </View>
-              <Text style={styles.name}>{displayName}</Text>
+              <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
               <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={16} color="#F59E0B" />
-                <Text style={styles.rating}>{displayRating}</Text>
-                <Text style={styles.reviews}>({displayReviews} reviews)</Text>
+                <Ionicons name="star" size={16} color={colors.warning} />
+                <Text style={[styles.rating, { color: colors.text }]}>{displayRating}</Text>
+                <Text style={[styles.reviews, { color: colors.muted }]}>({displayReviews} reviews)</Text>
               </View>
-              <Text style={styles.joinDate}>Member since {joinedAt}</Text>
+              <Text style={[styles.joinDate, { color: colors.muted }]}>Member since {joinedAt}</Text>
               <View style={styles.verificationContainer}>
                 {isVerified ? (
-                  <View style={styles.verifiedStatus}>
-                    <Ionicons name="shield-checkmark" size={16} color="#10B981" />
-                    <Text style={styles.verifiedText}>Verified Seller</Text>
+                  <View style={[styles.verifiedStatus, { backgroundColor: colors.successMuted }]}>
+                    <Ionicons name="shield-checkmark" size={16} color={colors.success} />
+                    <Text style={[styles.verifiedText, { color: colors.success } ]}>Verified Seller</Text>
                   </View>
                 ) : (
-                  <View style={styles.pendingStatus}>
-                    <Ionicons name="shield-outline" size={16} color="#64748B" />
-                    <Text style={styles.pendingText}>Not Verified</Text>
+                  <View style={[styles.pendingStatus, { backgroundColor: colors.warningMuted }]}>
+                    <Ionicons name="shield-outline" size={16} color={colors.muted} />
+                    <Text style={[styles.pendingText, { color: colors.muted }]}>Not Verified</Text>
                   </View>
                 )}
               </View>
               <View style={styles.actionsRow}>
                 <TouchableOpacity
-                  style={styles.messageButton}
+                  style={[styles.messageButton, { borderColor: colors.primary }]}
                   onPress={() => navigation.navigate('Chat', { userId: sellerId })}
                 >
-                  <Ionicons name="chatbubble-outline" size={20} color="#6366F1" />
-                  <Text style={styles.messageButtonText}>Message Seller</Text>
+                  <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
+                  <Text style={[styles.messageButtonText, { color: colors.primary }]}>Message Seller</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <View style={styles.statsContainer}>
+            <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{listingsCount}</Text>
-                <Text style={styles.statLabel}>Listings</Text>
+                <Text style={[styles.statValue, { color: colors.text }]}>{listingsCount}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>Listings</Text>
               </View>
             </View>
 
             <View style={styles.listingsContainer}>
               <View style={styles.listingsHeader}>
-                <Text style={styles.listingsTitle}>Active Listings</Text>
+                <Text style={[styles.listingsTitle, { color: colors.text }]}>Active Listings</Text>
               </View>
               {listingsLoading ? (
                 <View style={styles.emptyStateContainer}>
-                  <ActivityIndicator size="small" color="#4338CA" />
+                  <ActivityIndicator size="small" color={colors.primary} />
                 </View>
               ) : listings.length === 0 ? (
                 <View style={styles.emptyStateContainer}>
-                  <Ionicons name="cube-outline" size={40} color="#94A3B8" />
-                  <Text style={styles.emptyStateTitle}>No listings yet</Text>
-                  <Text style={styles.emptyStateSubtitle}>This seller has no active listings.</Text>
+                  <Ionicons name="cube-outline" size={40} color={colors.muted} />
+                  <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No listings yet</Text>
+                  <Text style={[styles.emptyStateSubtitle, { color: colors.muted }]}>This seller has no active listings.</Text>
                 </View>
               ) : (
                 <FlatList
@@ -211,6 +223,10 @@ const SellerProfileScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, paddingTop: 40, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  backButton: { padding: 4 },
+  topBarTitle: { fontSize: 18, fontWeight: '600', color: '#1E293B' },
+  placeholder: { width: 24, height: 24 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' },
   errorText: { marginTop: 10, fontSize: 16, color: 'red', textAlign: 'center', marginBottom: 16 },
   retryButton: { backgroundColor: '#6366F1', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },

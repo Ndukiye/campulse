@@ -7,10 +7,28 @@ type ThemeMode = 'light' | 'dark';
 type ThemeColors = {
   background: string;
   card: string;
+  surface: string;
   text: string;
+  muted: string;
   border: string;
   primary: string;
-  muted: string;
+  accent: string;
+  inputBackground: string;
+  inputBorder: string;
+  icon: string;
+  success: string;
+  successMuted: string;
+  danger: string;
+  dangerMuted: string;
+  warning: string;
+  warningMuted: string;
+  info: string;
+  infoMuted: string;
+  overlay: string;
+  disabled: string;
+  chipActiveBg: string;
+  chipInactiveBg: string;
+  chipActiveText: string;
 };
 
 type ThemeContextType = {
@@ -24,19 +42,55 @@ type ThemeContextType = {
 const LIGHT_COLORS: ThemeColors = {
   background: '#F8FAFC',
   card: '#FFFFFF',
-  text: '#1E293B',
+  surface: '#F1F5F9',
+  text: '#0F172A',
+  muted: '#64748B',
   border: '#E2E8F0',
   primary: '#6366F1',
-  muted: '#64748B',
+  accent: '#22D3EE',
+  inputBackground: '#F1F5F9',
+  inputBorder: '#CBD5E1',
+  icon: '#475569',
+  success: '#10B981',
+  successMuted: '#D1FAE5',
+  danger: '#EF4444',
+  dangerMuted: '#FEE2E2',
+  warning: '#F59E0B',
+  warningMuted: '#FEF3C7',
+  info: '#3B82F6',
+  infoMuted: '#DBEAFE',
+  overlay: 'rgba(0,0,0,0.4)',
+  disabled: '#94A3B8',
+  chipActiveBg: '#6366F1',
+  chipInactiveBg: '#E5E7EB',
+  chipActiveText: '#FFFFFF',
 };
 
 const DARK_COLORS: ThemeColors = {
-  background: '#0F172A',
+  background: '#0B1020',
   card: '#111827',
+  surface: '#1F2937',
   text: '#E5E7EB',
-  border: '#334155',
-  primary: '#8B5CF6',
   muted: '#94A3B8',
+  border: '#243047',
+  primary: '#8B5CF6',
+  accent: '#22D3EE',
+  inputBackground: '#1F2937',
+  inputBorder: '#374151',
+  icon: '#9CA3AF',
+  success: '#34D399',
+  successMuted: '#064E3B',
+  danger: '#F87171',
+  dangerMuted: '#7F1D1D',
+  warning: '#FBBF24',
+  warningMuted: '#78350F',
+  info: '#60A5FA',
+  infoMuted: '#1E3A8A',
+  overlay: 'rgba(0,0,0,0.6)',
+  disabled: '#6B7280',
+  chipActiveBg: '#4C51BF',
+  chipInactiveBg: '#1F2937',
+  chipActiveText: '#FFFFFF',
 };
 
 const ThemeContext = createContext<ThemeContextType>({

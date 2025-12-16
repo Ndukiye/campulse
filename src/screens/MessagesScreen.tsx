@@ -65,8 +65,8 @@ const MessagesScreen = () => {
       <View style={styles.avatarContainer}>
         <Image source={{ uri: item.otherUser.avatar_url ?? 'https://placehold.co/200x200?text=User' }} style={styles.avatar} />
         {item.otherUser.verified && (
-          <View style={styles.verifiedBadge}>
-            <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+          <View style={[styles.verifiedBadge, { backgroundColor: colors.card }]}>
+            <Ionicons name="checkmark-circle" size={14} color={colors.success} />
           </View>
         )}
       </View>
@@ -79,16 +79,17 @@ const MessagesScreen = () => {
           <Text 
             style={[
               styles.lastMessage,
-              item.unreadCount > 0 && item.lastMessage?.senderId !== user?.id && styles.unreadMessage
+              { color: colors.muted },
+              item.unreadCount > 0 && item.lastMessage?.senderId !== user?.id ? { color: colors.text, fontWeight: '500' } : null
             ]}
             numberOfLines={1}
           >
             {item.lastMessage?.text ?? ''}
           </Text>
-          {item.unreadCount > 0 && item.lastMessage?.senderId !== user?.id && <View style={styles.unreadDot} />}
+          {item.unreadCount > 0 && item.lastMessage?.senderId !== user?.id && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
         </View>
         {item.product && (
-          <View style={styles.productPreview}>
+          <View style={[styles.productPreview, { backgroundColor: colors.surface }]}>
             <Image 
               source={{ uri: item.product.image ?? 'https://placehold.co/200x200?text=CamPulse' }} 
               style={styles.productImage}
@@ -106,6 +107,14 @@ const MessagesScreen = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
+          {navigation.canGoBack() && (
+            <TouchableOpacity 
+              style={styles.headerIcon}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={22} color={colors.text} />
+            </TouchableOpacity>
+          )}
           <Text style={[styles.headerTitle, { color: colors.text }]}>Messages</Text>
         </View>
         <View style={styles.headerRight}>
@@ -145,13 +154,13 @@ const MessagesScreen = () => {
 
       {loading ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator size="large" color="#6366F1" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : filteredConversations.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubble-ellipses-outline" size={64} color="#94A3B8" />
-          <Text style={styles.emptyStateText}>No conversations yet</Text>
-          <Text style={styles.emptyStateSubtext}>
+          <Ionicons name="chatbubble-ellipses-outline" size={64} color={colors.muted} />
+          <Text style={[styles.emptyStateText, { color: colors.text }]}>No conversations yet</Text>
+          <Text style={[styles.emptyStateSubtext, { color: colors.muted }]}>
             Start a conversation by messaging a seller
           </Text>
         </View>

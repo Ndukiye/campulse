@@ -190,9 +190,9 @@ const ListingDetailsScreen = () => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Loading Details...</Text>
+      <SafeAreaView style={[styles.container, styles.centered, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.muted }]}>Loading Details...</Text>
       </SafeAreaView>
     );
   }
@@ -200,7 +200,7 @@ const ListingDetailsScreen = () => {
   if (error) {
     return (
       <SafeAreaView style={[styles.container, styles.centered]}>
-        <Ionicons name="alert-circle-outline" size={48} color="red" />
+        <Ionicons name="alert-circle-outline" size={48} color={colors.danger} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity onPress={() => { /* Implement retry logic */ }} style={styles.retryButton}>
             <Text style={styles.retryButtonText}>Try Again</Text>
@@ -212,7 +212,7 @@ const ListingDetailsScreen = () => {
   if (!currentProduct) {
     return (
       <SafeAreaView style={[styles.container, styles.centered]}>
-        <Ionicons name="alert-circle-outline" size={48} color="orange" />
+        <Ionicons name="alert-circle-outline" size={48} color={colors.warning} />
         <Text style={styles.errorText}>Product not found.</Text>
          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.retryButton}>
             <Text style={styles.retryButtonText}>Go Back</Text>
@@ -256,7 +256,7 @@ const ListingDetailsScreen = () => {
             }
           }}
         >
-          <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? "#FF0000" : colors.text} />
+          <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? colors.danger : colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -264,7 +264,7 @@ const ListingDetailsScreen = () => {
         data={[1]} // Single item to render the sections
         renderItem={() => (
           <>
-            <View style={styles.imageCarousel}>
+            <View style={[styles.imageCarousel, { backgroundColor: colors.card }]}>
               <FlatList
                 ref={imageCarouselRef}
                 data={productImages}
@@ -299,7 +299,7 @@ const ListingDetailsScreen = () => {
               <ScrollView 
                 horizontal 
                 showsHorizontalScrollIndicator={false}
-                style={styles.thumbnailsContainer}
+                style={[styles.thumbnailsContainer, { backgroundColor: colors.card }]}
                 contentContainerStyle={styles.thumbnailsContentContainer}
               >
                 {productImages.map((item, index) => (
@@ -307,7 +307,7 @@ const ListingDetailsScreen = () => {
                     key={item.id}
                     style={[
                       styles.thumbnail,
-                      activeImageIndex === index && styles.activeThumbnail,
+                      activeImageIndex === index && [styles.activeThumbnail, { borderColor: colors.primary }],
                     ]}
                     onPress={() => {
                       setActiveImageIndex(index);
@@ -320,36 +320,36 @@ const ListingDetailsScreen = () => {
               </ScrollView>
             )}
 
-            <View style={styles.infoContainer}>
-              <Text style={styles.price}>₦{(currentProduct.price ?? 0).toLocaleString()}</Text>
-              <Text style={styles.title}>{currentProduct.title}</Text>
+            <View style={[styles.infoContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+              <Text style={[styles.price, { color: colors.primary }]}>₦{(currentProduct.price ?? 0).toLocaleString()}</Text>
+              <Text style={[styles.title, { color: colors.text }]}>{currentProduct.title}</Text>
               <View style={styles.conditionContainer}>
-                <Text style={styles.conditionLabel}>Condition:</Text>
-                <Text style={styles.condition}>{String(currentProduct.condition ?? '').replace('-', ' ')}</Text>
+                <Text style={[styles.conditionLabel, { color: colors.muted }]}>Condition:</Text>
+                <Text style={[styles.condition, { color: colors.text, backgroundColor: colors.surface }]}>{String(currentProduct.condition ?? '').replace('-', ' ')}</Text>
               </View>
-              <Text style={styles.dateListed}>Listed {currentProduct.created_at ? new Date(currentProduct.created_at).toLocaleDateString() : '—'}</Text>
+              <Text style={[styles.dateListed, { color: colors.muted }]}>Listed {currentProduct.created_at ? new Date(currentProduct.created_at).toLocaleDateString() : '—'}</Text>
               <View style={styles.stockContainer}>
-                <Ionicons name="cube-outline" size={16} color="#6366F1" />
-                <Text style={styles.stockText}>In Stock: {currentProduct.available_quantity ?? '—'}</Text>
+                <Ionicons name="cube-outline" size={16} color={colors.primary} />
+                <Text style={[styles.stockText, { color: colors.muted }]}>In Stock: {currentProduct.available_quantity ?? '—'}</Text>
               </View>
             </View>
 
-            <View style={styles.sellerContainer}>
+            <View style={[styles.sellerContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <View style={styles.sellerHeader}>
-              <View style={styles.sellerAvatar}>
-                <Ionicons name="person" size={24} color="#6366F1" />
+              <View style={[styles.sellerAvatar, { backgroundColor: colors.surface }]}>
+                <Ionicons name="person" size={24} color={colors.primary} />
               </View>
               <View style={styles.sellerInfo}>
-                <Text style={styles.sellerName}>
+                <Text style={[styles.sellerName, { color: colors.text }]}>
                   {sellerProfile?.name ?? '—'}
                 </Text>
                 <View style={styles.sellerMeta}>
                   {sellerLoading ? (
-                    <ActivityIndicator size="small" color="#6366F1" />
+                    <ActivityIndicator size="small" color={colors.primary} />
                   ) : sellerError ? (
-                    <Text style={styles.sellerRating}>Seller info unavailable</Text>
+                    <Text style={[styles.sellerRating, { color: colors.muted }]}>Seller info unavailable</Text>
                   ) : (
-                    <Text style={styles.sellerRating}>
+                    <Text style={[styles.sellerRating, { color: colors.muted }]}>
                       ⭐ {sellerProfile?.rating ?? '—'}{typeof sellerProfile?.total_reviews === 'number' ? ` (${sellerProfile.total_reviews} reviews)` : ''}
                     </Text>
                   )}
@@ -357,38 +357,58 @@ const ListingDetailsScreen = () => {
               </View>
             </View>
             <TouchableOpacity 
-              style={styles.viewProfileButton}
+              style={[styles.viewProfileButton, { borderColor: colors.primary, backgroundColor: colors.card }]}
               onPress={() => {
                 if (currentProduct?.seller_id) {
                   navigation.navigate('SellerProfile', { userId: currentProduct.seller_id });
                 }
               }} 
             >
-              <Text style={styles.viewProfileText}>View Seller</Text>
+              <Text style={[styles.viewProfileText, { color: colors.primary }]}>View Seller</Text>
             </TouchableOpacity>
             </View>
 
-            <View style={styles.descriptionContainer}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Text style={styles.description}>
+            <View style={[styles.descriptionContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Description</Text>
+              <Text style={[styles.description, { color: colors.muted }]}>
                 {currentProduct.description ?? 'No description'}
               </Text>
             </View>
             {/** Location **/}
-            <View style={styles.locationContainer}>
-              <Text style={styles.sectionTitle}>Location</Text>
+            <View style={[styles.locationContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Location</Text>
               <View style={styles.locationInfo}>
-                <Ionicons name="location-outline" size={20} color="#6366F1" />
-                <Text style={styles.locationText}>{sellerProfile?.location ?? '—'}</Text>
+                <Ionicons name="location-outline" size={20} color={colors.primary} />
+                <Text style={[styles.locationText, { color: colors.muted }]}>{sellerProfile?.location ?? '—'}</Text>
               </View>
             </View>
             
             {comments.length > 0 && (
-              <View style={styles.commentsSection}>
-                <Text style={styles.sectionTitle}>Comments ({comments.length})</Text>
+              <View style={[styles.commentsSection, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Comments ({comments.length})</Text>
                 <FlatList
                   data={comments}
-                  renderItem={renderComment}
+                  renderItem={({ item }) => (
+                    <View style={styles.commentContainer}>
+                      <View style={styles.commentHeader}>
+                        <View style={styles.commentUserInfo}>
+                          <View style={[styles.commentUserAvatar, { backgroundColor: colors.surface }]}>
+                            <Ionicons name="person" size={20} color={colors.primary} />
+                          </View>
+                          <View>
+                            <Text style={[styles.commentUser, { color: colors.text }]}>{item.user}</Text>
+                            <View style={styles.commentMeta}>
+                              <Text style={[styles.commentRating, { color: colors.muted }]}>⭐ {item.rating}</Text>
+                              <Text style={[styles.commentDate, { color: colors.muted }]}>{item.date}</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={styles.commentContent}>
+                        <Text style={[styles.commentText, { color: colors.muted }]}>{item.comment}</Text>
+                      </View>
+                    </View>
+                  )}
                   keyExtractor={(item) => item.id}
                   scrollEnabled={false}
                 />
@@ -396,11 +416,24 @@ const ListingDetailsScreen = () => {
             )}
             
             {relatedProducts.length > 0 && (
-              <View style={styles.relatedItemsSection}>
-                <Text style={styles.sectionTitle}>Related Items</Text>
+              <View style={[styles.relatedItemsSection, { backgroundColor: colors.card }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Related Items</Text>
                 <FlatList
                   data={relatedProducts}
-                  renderItem={renderRelatedItem}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[styles.relatedItemCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => navigation.push('ListingDetails', { listingId: item.id })}
+                    >
+                      <Image source={{ uri: item.images?.[0] ?? 'https://placehold.co/200x200?text=CamPulse' }} style={styles.relatedItemImage} />
+                      <View style={styles.relatedItemInfo}>
+                        <Text style={[styles.relatedItemTitle, { color: colors.text }]} numberOfLines={2}>
+                          {item.title}
+                        </Text>
+                        <Text style={[styles.relatedItemPrice, { color: colors.primary }]}>₦{(item.price ?? 0).toLocaleString()}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
                   keyExtractor={(item) => item.id}
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -414,28 +447,27 @@ const ListingDetailsScreen = () => {
         showsVerticalScrollIndicator={false}
   />
 
-      <View style={styles.actionContainer}>
+      <View style={[styles.actionContainer, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
         <TouchableOpacity 
-          style={styles.messageButton}
+          style={[styles.messageButton, { borderColor: colors.primary, flex: 0, width: 48 }]}
           onPress={() => {
             if (currentProduct?.seller_id) {
               navigation.navigate('Chat', { userId: currentProduct.seller_id });
             }
           }}
         >
-          <Ionicons name="chatbubble-outline" size={20} color="#6366F1" />
-          <Text style={styles.messageButtonText}>Message</Text>
+          <Ionicons name="chatbubble-outline" size={20} color={colors.primary} />
         </TouchableOpacity>
-        <View style={styles.quantityPicker}>
+        <View style={[styles.quantityPicker, { backgroundColor: colors.surface }]}>
           <TouchableOpacity
             style={styles.qtyBtn}
             onPress={() => {
               setQuantity((q) => Math.max(1, q - 1));
             }}
           >
-            <Ionicons name="remove-circle-outline" size={22} color="#6366F1" />
+            <Ionicons name="remove-circle-outline" size={22} color={colors.primary} />
           </TouchableOpacity>
-          <Text style={styles.qtyText}>{quantity}</Text>
+          <Text style={[styles.qtyText, { color: colors.text }]}>{quantity}</Text>
           <TouchableOpacity
             style={styles.qtyBtn}
             onPress={() => {
@@ -443,11 +475,11 @@ const ListingDetailsScreen = () => {
               setQuantity((q) => Math.min(maxQty, q + 1));
             }}
           >
-            <Ionicons name="add-circle-outline" size={22} color="#6366F1" />
+            <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
           </TouchableOpacity>
         </View>
         <TouchableOpacity 
-          style={[styles.messageButton, (Number(currentProduct?.available_quantity ?? 1) <= 0) ? { opacity: 0.6 } : null]}
+          style={[styles.messageButton, { flex: 0, width: 48 }, (Number(currentProduct?.available_quantity ?? 1) <= 0) ? { opacity: 0.6 } : null]}
           onPress={async () => {
             if (!user?.id || !currentProduct?.id) { Alert.alert('Sign in required', 'Sign in to add to cart'); return }
             if (Number(currentProduct?.available_quantity ?? 0) <= 0) { Alert.alert('Out of Stock', 'This item is currently out of stock'); return }
@@ -456,10 +488,7 @@ const ListingDetailsScreen = () => {
             else toast.show('Cart', 'Added to cart', 'success')
           }}
         >
-          <Ionicons name="cart-outline" size={20} color="#6366F1" />
-          <Text style={styles.messageButtonText}>
-            {Number(currentProduct?.available_quantity ?? 1) > 0 ? 'Add to Cart' : 'Out of Stock'}
-          </Text>
+          <Ionicons name="cart-outline" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

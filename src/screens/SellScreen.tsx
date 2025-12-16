@@ -388,23 +388,23 @@ const SellScreen = () => {
             <Text style={[styles.listingDate, { color: colors.muted }]}>Posted: {createdDate}</Text>
             <View style={styles.listingActions}>
               <TouchableOpacity
-                style={[styles.actionButton, styles.editButton]}
+                style={[styles.actionButton, styles.editButton, { backgroundColor: colors.surface }]}
                 onPress={() => openEdit(item)}
               >
-                <Ionicons name="pencil" size={20} color="#4338CA" />
-                <Text style={styles.actionButtonText}>Edit</Text>
+                <Ionicons name="pencil" size={20} color={colors.primary} />
+                <Text style={[styles.actionButtonText, { color: colors.primary }]}>Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionButton, styles.deleteButton]}
+                style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.dangerMuted }]}
                 onPress={() => handleDeleteListing(item.id)}
                 disabled={deletingId === item.id}
               >
                 {deletingId === item.id ? (
-                  <ActivityIndicator size="small" color="#DC2626" />
+                  <ActivityIndicator size="small" color={colors.danger} />
                 ) : (
                   <>
-                    <Ionicons name="trash" size={20} color="#DC2626" />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
+                    <Ionicons name="trash" size={20} color={colors.danger} />
+                    <Text style={[styles.actionButtonText, { color: colors.danger }]}>Delete</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -479,11 +479,11 @@ const SellScreen = () => {
     >
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalContainer}
+        style={[styles.modalContainer, { backgroundColor: colors.overlay }]}
       >
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{editingItem ? 'Edit Listing' : 'Create New Listing'}</Text>
+        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{editingItem ? 'Edit Listing' : 'Create New Listing'}</Text>
             <TouchableOpacity 
               style={styles.closeButton}
               onPress={() => {
@@ -491,7 +491,7 @@ const SellScreen = () => {
                 resetForm();
               }}
             >
-              <Ionicons name="close" size={24} color="#1E293B" />
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -501,33 +501,33 @@ const SellScreen = () => {
             showsVerticalScrollIndicator={true}
           >
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Title*</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Title*</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
                 value={title}
                 onChangeText={setTitle}
                 placeholder="Enter item title"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.muted}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Description*</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Description*</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
                 value={description}
                 onChangeText={setDescription}
                 placeholder="Describe your item"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.muted}
                 multiline
                 numberOfLines={4}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Price*</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Price*</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
                 value={price}
                 onChangeText={(v) => {
                   setPrice(v);
@@ -544,59 +544,59 @@ const SellScreen = () => {
                   }
                 }}
                 placeholder="Enter price"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.muted}
                 keyboardType="decimal-pad"
               />
-              <View style={styles.infoNotice}>
-                <Ionicons name="information-circle-outline" size={16} color="#64748B" />
-                <Text style={styles.infoNoticeText}>
+              <View style={[styles.infoNotice, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                <Ionicons name="information-circle-outline" size={16} color={colors.muted} />
+                <Text style={[styles.infoNoticeText, { color: colors.muted }]}>
                   Estimated take-home: ₦{Number(estimatedNet ?? 0).toLocaleString()} (after platform and Paystack fees)
                 </Text>
               </View>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Available Quantity*</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Available Quantity*</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
                 value={availableQuantity}
                 onChangeText={setAvailableQuantity}
                 placeholder="Number of items in stock"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={colors.muted}
                 keyboardType="numeric"
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Category*</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Category*</Text>
               <TouchableOpacity
-                style={styles.pickerButton}
+                style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
                 onPress={() => {
                   setShowCategoryPicker(true);
                 }}
               >
-                <Text style={styles.pickerButtonText}>
+                <Text style={[styles.pickerButtonText, { color: colors.text }]}>
                   {selectedCategory || 'Select category'}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color="#64748B" />
+                <Ionicons name="chevron-down" size={20} color={colors.muted} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Condition*</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Condition*</Text>
               <TouchableOpacity
-                style={styles.pickerButton}
+                style={[styles.pickerButton, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}
                 onPress={() => setShowConditionPicker(true)}
               >
-                <Text style={styles.pickerButtonText}>{condition}</Text>
-                <Ionicons name="chevron-down" size={20} color="#64748B" />
+                <Text style={[styles.pickerButtonText, { color: colors.text }]}>{condition}</Text>
+                <Ionicons name="chevron-down" size={20} color={colors.muted} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Upload Images</Text>
-              <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
-                <Text style={styles.imagePickerButtonText}>Add Image(s)</Text>
+              <Text style={[styles.label, { color: colors.text }]}>Upload Images</Text>
+              <TouchableOpacity style={[styles.imagePickerButton, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={pickImage}>
+                <Text style={[styles.imagePickerButtonText, { color: colors.text }]}>Add Image(s)</Text>
               </TouchableOpacity>
               {images.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -614,15 +614,15 @@ const SellScreen = () => {
                 </ScrollView>
               )}
             </View>
-            <View style={styles.infoNotice}>
-              <Ionicons name="information-circle-outline" size={16} color="#64748B" />
-              <Text style={styles.infoNoticeText}>
+            <View style={[styles.infoNotice, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.muted} />
+              <Text style={[styles.infoNoticeText, { color: colors.muted }]}>
                 Payments are held in escrow. A 3% transaction fee is deducted from the seller payout after successful delivery confirmation. Delivery is handled by buyer and seller directly.
               </Text>
             </View>
 
             <TouchableOpacity 
-              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+              style={[styles.submitButton, { backgroundColor: colors.primary }, isSubmitting && styles.submitButtonDisabled]}
               onPress={editingItem ? handleSaveChanges : handleCreateListing}
               disabled={isSubmitting}
             >
@@ -660,7 +660,7 @@ const SellScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: '#E2E8F0' }] }>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }] }>
         <View style={styles.headerLeft}>
           <Text style={[styles.headerTitle, { color: colors.primary }]}>My Listings</Text>
         </View>
@@ -687,8 +687,8 @@ const SellScreen = () => {
       </View>
 
       {/* Search for my listings */}
-      <View style={[styles.searchRow, { backgroundColor: colors.card, borderBottomColor: '#E2E8F0' }] }>
-        <View style={[styles.searchContainer, { backgroundColor: colors.background }] }>
+      <View style={[styles.searchRow, { backgroundColor: colors.card, borderBottomColor: colors.border }] }>
+        <View style={[styles.searchContainer, { backgroundColor: colors.background, borderColor: colors.border }] }>
           <Ionicons name="search" size={18} color={colors.primary} style={styles.searchIcon} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
@@ -702,8 +702,8 @@ const SellScreen = () => {
       </View>
 
       {loadingListings ? (
-        <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color="#4338CA" />
+        <View style={[styles.loadingState, { backgroundColor: colors.background }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : listings.length === 0 ? (
         <View style={styles.emptyState}>

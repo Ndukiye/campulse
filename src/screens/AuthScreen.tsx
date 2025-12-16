@@ -132,6 +132,7 @@ const AuthScreen = () => {
                   placeholder="Enter your full name"
                   autoCapitalize="words"
                 />
+                <Text style={styles.disclaimerText}>Use your real name. Name cannot be changed later.</Text>
               </View>
             )}
 
@@ -346,6 +347,11 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  disclaimerText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#64748B',
   },
   switchButton: {
     marginTop: 16,

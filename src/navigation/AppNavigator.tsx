@@ -1,4 +1,5 @@
 import React from 'react';
+import { SafeAreaView, View, ActivityIndicator, Text } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -100,7 +101,12 @@ const AppNavigator = () => {
 
   if (loading) {
     console.log('[AppNavigator] Showing loading state');
-    return null; // Or a loading screen
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 12, color: colors.muted, fontSize: 14, fontWeight: '500' }}>Loading...</Text>
+      </SafeAreaView>
+    )
   }
 
   const base = isDark ? DarkTheme : DefaultTheme;

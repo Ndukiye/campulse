@@ -10,6 +10,8 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { RootStackNavigationProp } from '../types/navigation';
 import { useAuth } from '../context/AuthContext';
 import { useThemeMode } from '../context/ThemeContext';
 import { TextInput } from 'react-native';
@@ -18,6 +20,7 @@ import { registerPaystackRecipient, listPaystackBanks } from '../services/paysta
 const SettingsScreen = () => {
   const { signOut, user } = useAuth();
   const { isDark, toggleTheme, colors } = useThemeMode();
+  const navigation = useNavigation<RootStackNavigationProp>();
   const [settings, setSettings] = useState({
     locationServices: true,
     saveHistory: true,
@@ -96,13 +99,13 @@ const SettingsScreen = () => {
     key: 'darkMode' | keyof typeof settings,
     icon: string
   ) => (
-    <View style={styles.settingItem}>
-      <View style={styles.settingIcon}>
-        <Ionicons name={icon as any} size={24} color="#6366F1" />
+    <View style={[styles.settingItem, { borderBottomColor: colors.border }]}>
+      <View style={[styles.settingIcon, { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1 }]}>
+        <Ionicons name={icon as any} size={24} color={colors.primary} />
       </View>
       <View style={styles.settingContent}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        <Text style={styles.settingDescription}>{description}</Text>
+        <Text style={[styles.settingTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.settingDescription, { color: colors.muted }]}>{description}</Text>
       </View>
       <Switch
         value={key === 'darkMode' ? isDark : settings[key as keyof typeof settings]}
@@ -122,7 +125,14 @@ const SettingsScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }] }>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }] }>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
+        <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.content}>
@@ -149,124 +159,30 @@ const SettingsScreen = () => {
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.card }] }>
-          <Text style={styles.sectionTitle}>Storage</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Storage</Text>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={[styles.actionButton, { borderBottomColor: colors.border }]}
             onPress={handleClearCache}
           >
-            <Ionicons name="trash-outline" size={24} color="#6366F1" />
-            <Text style={styles.actionButtonText}>Clear Cache</Text>
-            <Ionicons name="chevron-forward" size={24} color="#64748B" />
+            <Ionicons name="trash-outline" size={24} color={colors.primary} />
+            <Text style={[styles.actionButtonText, { color: colors.text }]}>Clear Cache</Text>
+            <Ionicons name="chevron-forward" size={24} color={colors.muted} />
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.section, { backgroundColor: colors.card }] }>
-          <Text style={styles.sectionTitle}>Payment Details</Text>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Bank</Text>
-            <TextInput
-              style={styles.input}
-              value={bankQuery}
-              onChangeText={(v) => {
-                setBankQuery(v);
-                const match = banks.find(b => b.name.toLowerCase() === v.toLowerCase());
-                if (match) setBankCode(match.code);
-              }}
-              placeholder="Type bank name"
-              placeholderTextColor="#94A3B8"
-            />
-            {!!bankQuery.trim() && (
-              <View style={[styles.suggestionBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <ScrollView style={{ maxHeight: 220 }}>
-                  {banks
-                    .filter(b => b.name.toLowerCase().includes(bankQuery.toLowerCase()))
-                    .map((b) => (
-                      <TouchableOpacity
-                        key={b.code}
-                        style={[styles.suggestionRow, { borderColor: colors.border }]}
-                        onPress={() => {
-                          setBankCode(b.code);
-                          setBankQuery(b.name);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.bankName, { color: colors.text }]}>{b.name}</Text>
-                        {bankCode === b.code && (
-                          <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Account Number</Text>
-            <TextInput
-              style={styles.input}
-              value={accountNumber}
-              onChangeText={setAccountNumber}
-              placeholder="10-digit account number"
-              placeholderTextColor="#94A3B8"
-              keyboardType="numeric"
-            />
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Account Name</Text>
-            <TextInput
-              style={styles.input}
-              value={accountName}
-              onChangeText={setAccountName}
-              placeholder="Account holder name"
-              placeholderTextColor="#94A3B8"
-            />
-          </View>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.saveButton]}
-            onPress={async () => {
-              if (!bankCode.trim() || !accountNumber.trim() || !accountName.trim()) {
-                Alert.alert('Validation', 'Please fill all payment details');
-                return;
-              }
-              try {
-                if (!user?.id) { Alert.alert('Authentication', 'Please sign in'); return }
-                setSavingRecipient(true);
-                const res = await registerPaystackRecipient({
-                  userId: user.id,
-                  bankCode,
-                  accountNumber,
-                  accountName,
-                });
-                setSavingRecipient(false);
-                if (res.error) {
-                  Alert.alert('Payment Details', res.error);
-                } else {
-                  Alert.alert('Payment Details', 'Recipient saved successfully');
-                }
-              } catch (e) {
-                setSavingRecipient(false);
-                Alert.alert('Payment Details', 'Failed to save recipient');
-              }
-            }}
-          >
-            <Ionicons name="card-outline" size={24} color="#6366F1" />
-            <Text style={styles.actionButtonText}>{savingRecipient ? 'Saving...' : 'Save Payment Details'}</Text>
-            <Ionicons name="chevron-forward" size={24} color="#64748B" />
-          </TouchableOpacity>
-          
-        </View>
+        
 
         <View style={[styles.section, styles.accountSection, { backgroundColor: colors.card }] }>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
           <TouchableOpacity
-            style={[styles.actionButton, styles.logoutButton]}
+            style={[styles.actionButton, styles.logoutButton, { borderBottomColor: colors.border }]}
             onPress={handleLogout}
           >
             <Ionicons name="log-out-outline" size={24} color="#DC2626" />
-            <Text style={[styles.actionButtonText, styles.logoutButtonText]}>
+            <Text style={[styles.actionButtonText, styles.logoutButtonText, { color: colors.text }]}>
               Log Out
             </Text>
-            <Ionicons name="chevron-forward" size={24} color="#64748B" />
+            <Ionicons name="chevron-forward" size={24} color={colors.muted} />
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -282,7 +198,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
@@ -290,10 +206,17 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E8F0',
     paddingTop: 40,
   },
+  backButton: {
+    padding: 4,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1E293B',
+  },
+  placeholder: {
+    width: 24,
+    height: 24,
   },
   content: {
     flex: 1,

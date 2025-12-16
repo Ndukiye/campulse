@@ -86,17 +86,17 @@ const HomeScreen = () => {
   const renderFeaturedListing = (listing: ProductSummary) => (
     <TouchableOpacity
       key={listing.id}
-      style={styles.productCard}
+      style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={() => navigation.navigate('ListingDetails', { listingId: listing.id })}
     >
-      <Image source={{ uri: listing.images?.[0] ?? 'https://placehold.co/200x200?text=CamPulse' }} style={styles.productImage} />
-      <View style={styles.featuredInfo}>
+      <Image source={{ uri: listing.images?.[0] ?? 'https://placehold.co/200x200?text=CamPulse' }} style={[styles.productImage, { backgroundColor: colors.surface }]} />
+      <View style={[styles.featuredInfo, { backgroundColor: colors.card }]}>
         <Text style={[styles.featuredTitle, { color: colors.text }]} numberOfLines={2}>
           {listing.title}
         </Text>
-        <Text style={styles.featuredPrice}>₦{(listing.price ?? 0).toLocaleString()}</Text>
+        <Text style={[styles.featuredPrice, { color: colors.primary }]}>₦{(listing.price ?? 0).toLocaleString()}</Text>
         <View style={styles.featuredMeta}>
-          <Text style={[styles.featuredCondition, { color: colors.muted }]}>{String(listing.condition ?? '').replace('-', ' ')}</Text>
+          <Text style={[styles.featuredCondition, { color: colors.muted, backgroundColor: colors.surface }]}>{String(listing.condition ?? '').replace('-', ' ')}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -155,8 +155,8 @@ const HomeScreen = () => {
       </View>
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
+        <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList

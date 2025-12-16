@@ -113,17 +113,17 @@ const NotificationsScreen = () => {
   const getNotificationColor = (type: Notification['type']) => {
     switch (type) {
       case 'message':
-        return '#4338CA';
+        return colors.primary;
       case 'favorite':
-        return '#DC2626';
+        return colors.danger;
       case 'review':
-        return '#F59E0B';
+        return colors.warning;
       case 'product_sold':
-        return '#059669';
+        return colors.success;
       case 'system':
-        return '#64748B';
+        return colors.muted;
       default:
-        return '#64748B';
+        return colors.muted;
     }
   };
 
@@ -161,15 +161,15 @@ const NotificationsScreen = () => {
 
   const renderSectionHeader = (date: string) => (
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionHeaderText}>{date}</Text>
+      <Text style={[styles.sectionHeaderText, { color: colors.muted }]}>{date}</Text>
     </View>
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="notifications-off-outline" size={64} color="#94A3B8" />
-      <Text style={styles.emptyStateText}>No notifications yet</Text>
-      <Text style={styles.emptyStateSubtext}>
+      <Ionicons name="notifications-off-outline" size={64} color={colors.muted} />
+      <Text style={[styles.emptyStateText, { color: colors.text }]}>No notifications yet</Text>
+      <Text style={[styles.emptyStateSubtext, { color: colors.muted }]}>
         We'll notify you when something important happens
       </Text>
     </View>
@@ -177,7 +177,7 @@ const NotificationsScreen = () => {
 
   const renderNotification = ({ item }: { item: Notification }) => (
     <TouchableOpacity
-      style={[styles.notificationItem, !item.read && styles.unreadNotification]}
+      style={[styles.notificationItem, { backgroundColor: colors.card }, !item.read ? { backgroundColor: colors.surface } : null]}
       onPress={async () => {
         setSelected(item);
         setShowDetail(true);
@@ -193,12 +193,12 @@ const NotificationsScreen = () => {
       </View>
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
-          <Text style={styles.notificationTitle}>{item.title}</Text>
-          <Text style={styles.notificationTime}>{item.time}</Text>
+          <Text style={[styles.notificationTitle, { color: colors.text }]}>{item.title}</Text>
+          <Text style={[styles.notificationTime, { color: colors.muted }]}>{item.time}</Text>
         </View>
-        <Text style={styles.notificationMessage} numberOfLines={1}>{item.message}</Text>
+        <Text style={[styles.notificationMessage, { color: colors.text }]} numberOfLines={1}>{item.message}</Text>
       </View>
-      {!item.read && <View style={styles.unreadDot} />}
+      {!item.read && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
       <TouchableOpacity
         onPress={async () => {
           if (!user?.id) return
@@ -209,7 +209,7 @@ const NotificationsScreen = () => {
         }}
         style={styles.deleteBtn}
       >
-        <Ionicons name="trash-outline" size={20} color="#DC2626" />
+        <Ionicons name="trash-outline" size={20} color={colors.danger} />
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -230,6 +230,12 @@ const NotificationsScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={{ padding: 4 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
         <View style={styles.headerLeft}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
         </View>
@@ -249,7 +255,7 @@ const NotificationsScreen = () => {
 
       {loading ? (
         <View style={styles.loadingState}>
-          <ActivityIndicator size="large" color="#4338CA" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : notifications.length === 0 ? (
         renderEmptyState()
@@ -275,7 +281,7 @@ const NotificationsScreen = () => {
         />
       )}
       {showDetail && selected && (
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
           <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>{selected.title}</Text>
@@ -288,8 +294,8 @@ const NotificationsScreen = () => {
                   <Text style={styles.modalBtnText}>Mark as read</Text>
                 </TouchableOpacity>
               )} */}
-              <TouchableOpacity onPress={() => { setShowDetail(false); setSelected(null); }} style={[styles.modalBtn, { backgroundColor: '#F1F5F9' }]}>
-                <Text style={[styles.modalBtnText, { color: '#1E293B' }]}>Close</Text>
+              <TouchableOpacity onPress={() => { setShowDetail(false); setSelected(null); }} style={[styles.modalBtn, { backgroundColor: colors.surface }]}>
+                <Text style={[styles.modalBtnText, { color: colors.text }]}>Close</Text>
               </TouchableOpacity>
             </View>
           </View>

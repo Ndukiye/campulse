@@ -115,15 +115,15 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
 
   const renderProductItem = ({ item }: { item: ProductSummary }) => (
     <TouchableOpacity
-      style={styles.productCard}
+      style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.border }]}
       onPress={() => navigation.navigate('ListingDetails', { listingId: item.id })}
     >
       <Image 
         source={{ uri: item.images?.[0] ?? 'https://placehold.co/400x500?text=CamPulse' }} 
-        style={styles.productImage}
+        style={[styles.productImage, { backgroundColor: colors.surface }]}
         resizeMode="cover"
       />
-      <View style={styles.productInfo}>
+      <View style={[styles.productInfo, { backgroundColor: colors.card }]}>
         <Text style={[styles.productTitle, { color: colors.text }]} numberOfLines={2}>
           {item.title}
         </Text>
@@ -142,25 +142,25 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
       transparent={true}
       onRequestClose={() => setShowFilters(false)}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.filterSection}>
-            <View style={styles.filterHeader}>
-              <Text style={styles.filterTitle}>Filters</Text>
+      <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={[styles.filterSection, { backgroundColor: colors.card }]}>
+            <View style={[styles.filterHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.filterTitle, { color: colors.text }]}>Filters</Text>
               <TouchableOpacity onPress={() => setShowFilters(false)}>
-                <Ionicons name="close" size={24} color="#1E293B" />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.filterContent}>
               {/* Price Range */}
               <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Price Range</Text>
+                <Text style={[styles.filterGroupTitle, { color: colors.text }]}>Price Range</Text>
                 <View style={styles.priceInputs}>
                   <View style={styles.priceInput}>
-                    <Text style={styles.priceLabel}>Min</Text>
+                    <Text style={[styles.priceLabel, { color: colors.muted }]}>Min</Text>
                     <TextInput
-                      style={styles.priceField}
+                      style={[styles.priceField, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
                       placeholder="₦0"
                       keyboardType="numeric"
                       value={filters.priceRange.min.toString()}
@@ -168,12 +168,13 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
                         ...filters,
                         priceRange: { ...filters.priceRange, min: Number(text) || 0 }
                       })}
+                      placeholderTextColor={colors.muted}
                     />
                   </View>
                   <View style={styles.priceInput}>
-                    <Text style={styles.priceLabel}>Max</Text>
+                    <Text style={[styles.priceLabel, { color: colors.muted }]}>Max</Text>
                     <TextInput
-                      style={styles.priceField}
+                      style={[styles.priceField, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder, color: colors.text }]}
                       placeholder="₦1,000,000"
                       keyboardType="numeric"
                       value={filters.priceRange.max.toString()}
@@ -181,6 +182,7 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
                         ...filters,
                         priceRange: { ...filters.priceRange, max: Number(text) || 0 }
                       })}
+                      placeholderTextColor={colors.muted}
                     />
                   </View>
                 </View>
@@ -188,21 +190,22 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
 
               {/* Seller Type */}
               <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Seller Type</Text>
+                <Text style={[styles.filterGroupTitle, { color: colors.text }]}>Seller Type</Text>
                 <View style={styles.filterOptions}>
                   {['all', 'verified', 'unverified'].map((type) => (
                     <TouchableOpacity
                       key={type}
                       style={[
                         styles.filterOption,
-                        filters.sellerType === type && styles.filterOptionActive,
+                        { borderColor: colors.border },
+                        filters.sellerType === type ? { backgroundColor: colors.chipActiveBg, borderColor: colors.chipActiveBg } : { backgroundColor: colors.chipInactiveBg },
                       ]}
                       onPress={() => setFilters({ ...filters, sellerType: type as FilterOptions['sellerType'] })}
                     >
                       <Text
                         style={[
                           styles.filterOptionText,
-                          filters.sellerType === type && styles.filterOptionTextActive,
+                          { color: filters.sellerType === type ? colors.chipActiveText : colors.text },
                         ]}
                       >
                         {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -214,21 +217,22 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
 
               {/* Condition */}
               <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Condition</Text>
+                <Text style={[styles.filterGroupTitle, { color: colors.text }]}>Condition</Text>
                 <View style={styles.filterOptions}>
                   {['all', 'new', 'like-new', 'good', 'fair'].map((condition) => (
                     <TouchableOpacity
                       key={condition}
                       style={[
                         styles.filterOption,
-                        filters.condition === condition && styles.filterOptionActive,
+                        { borderColor: colors.border },
+                        filters.condition === condition ? { backgroundColor: colors.chipActiveBg, borderColor: colors.chipActiveBg } : { backgroundColor: colors.chipInactiveBg },
                       ]}
                       onPress={() => setFilters({ ...filters, condition: condition as FilterOptions['condition'] })}
                     >
                       <Text
                         style={[
                           styles.filterOptionText,
-                          filters.condition === condition && styles.filterOptionTextActive,
+                          { color: filters.condition === condition ? colors.chipActiveText : colors.text },
                         ]}
                       >
                         {condition.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
@@ -240,7 +244,7 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
 
               {/* Sort By */}
               <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>Sort By</Text>
+                <Text style={[styles.filterGroupTitle, { color: colors.text }]}>Sort By</Text>
                 <View style={styles.filterOptions}>
                   {[
                     { key: 'newest', label: 'Newest' },
@@ -251,14 +255,15 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
                       key={opt.key}
                       style={[
                         styles.filterOption,
-                        sortBy === (opt.key as any) && styles.filterOptionActive,
+                        { borderColor: colors.border },
+                        sortBy === (opt.key as any) ? { backgroundColor: colors.chipActiveBg, borderColor: colors.chipActiveBg } : { backgroundColor: colors.chipInactiveBg },
                       ]}
                       onPress={() => setSortBy(opt.key as any)}
                     >
                       <Text
                         style={[
                           styles.filterOptionText,
-                          sortBy === (opt.key as any) && styles.filterOptionTextActive,
+                          { color: sortBy === (opt.key as any) ? colors.chipActiveText : colors.text },
                         ]}
                       >
                         {opt.label}
@@ -271,17 +276,17 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
 
             <View style={styles.filterActions}>
               <TouchableOpacity
-                style={styles.resetButton}
+                style={[styles.resetButton, { borderColor: colors.border }]}
                 onPress={() => setFilters({
                   priceRange: { min: 0, max: 1000000 },
                   sellerType: 'all',
                   condition: 'all',
                 })}
               >
-                <Text style={styles.resetButtonText}>Reset</Text>
+                <Text style={[styles.resetButtonText, { color: colors.muted }]}>Reset</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.applyButton}
+                style={[styles.applyButton, { backgroundColor: colors.primary }]}
                 onPress={() => setShowFilters(false)}
               >
                 <Text style={styles.applyButtonText}>Apply Filters</Text>
@@ -334,9 +339,9 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
             returnKeyType="search"
           />
         </View>
-        <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
-          <Ionicons name="options-outline" size={20} color="#6366F1" />
-          <Text style={styles.filterButtonText}>Filters</Text>
+        <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.surface }]} onPress={() => setShowFilters(true)}>
+          <Ionicons name="options-outline" size={20} color={colors.primary} />
+          <Text style={[styles.filterButtonText, { color: colors.primary }]}>Filters</Text>
         </TouchableOpacity>
       </View>
 
@@ -350,14 +355,16 @@ const BrowseScreen = ({ navigation }: BrowseScreenProps) => {
             <TouchableOpacity
               style={[
                 styles.categoryButton,
-                selectedCategory === item && styles.categoryButtonActive,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                selectedCategory === item ? { backgroundColor: colors.primary, borderColor: colors.primary } : null,
               ]}
               onPress={() => setSelectedCategory(item)}
             >
               <Text
                 style={[
                   styles.categoryButtonText,
-                  selectedCategory === item && styles.categoryButtonTextActive,
+                  { color: colors.text },
+                  selectedCategory === item ? { color: '#fff' } : null,
                 ]}
               >
                 {item}

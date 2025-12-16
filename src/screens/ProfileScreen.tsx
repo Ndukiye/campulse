@@ -34,6 +34,8 @@ import {
   confirmSellerDelivered,
 } from '../services/transactionService';
 import { useToast } from '../context/ToastContext';
+import { registerPaystackRecipient, listPaystackBanks } from '../services/paystackService';
+import { signIn as verifyPasswordSignIn } from '../services/authService';
 
 type EditableProfile = {
   name: string;
@@ -88,6 +90,18 @@ const ProfileScreen = () => {
   const [purchases, setPurchases] = useState<PurchaseSummary[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
   //
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [verifyingPassword, setVerifyingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [banks, setBanks] = useState<Array<{ name: string, code: string }>>([]);
+  const [bankQuery, setBankQuery] = useState('');
+  const [showBankSuggestions, setShowBankSuggestions] = useState(false);
+  const [bankCode, setBankCode] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountName, setAccountName] = useState('');
+  const [savingRecipient, setSavingRecipient] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -134,10 +148,30 @@ const ProfileScreen = () => {
 
     loadProfile();
 
+    const loadBanks = async () => {
+      const r = await listPaystackBanks();
+      if (!isMounted) return;
+      if (!r.error) setBanks(r.data);
+    };
+    loadBanks();
+
     return () => {
       isMounted = false;
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!profile) return
+    if (profile.bank_name) {
+      setBankQuery(profile.bank_name)
+      const match = banks.find(b => b.name.toLowerCase() === String(profile.bank_name).toLowerCase())
+      if (match) setBankCode(match.code)
+    } else {
+      setBankQuery('')
+      setBankCode('')
+    }
+    setAccountNumber(profile.account_number ?? '')
+  }, [banks, profile])
 
   useFocusEffect(
     React.useCallback(() => {
@@ -341,9 +375,8 @@ const ProfileScreen = () => {
               <TextInput
                 style={styles.input}
                 value={editedProfile.name}
-                onChangeText={(text) => setEditedProfile((prev) => ({ ...prev, name: text }))}
-                placeholder="Enter your name"
-                editable={!savingProfile}
+                placeholder="Name cannot be changed"
+                editable={false}
               />
             </View>
             <View style={styles.inputGroup}>
@@ -471,8 +504,8 @@ const ProfileScreen = () => {
     return (
     <View style={[styles.transactionCard, { backgroundColor: colors.card }]}>
       <View style={styles.transactionHeader}>
-          <Text style={styles.transactionTitle}>{item.productTitle}</Text>
-          <Text style={styles.transactionPrice}>
+          <Text style={[styles.transactionTitle, { color: colors.text }]}>{item.productTitle}</Text>
+          <Text style={[styles.transactionPrice, { color: colors.primary }]}>
             ₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </Text>
       </View>
@@ -551,8 +584,8 @@ const ProfileScreen = () => {
     return (
     <View style={[styles.transactionCard, { backgroundColor: colors.card }]}>
       <View style={styles.transactionHeader}>
-          <Text style={styles.transactionTitle}>{item.productTitle}</Text>
-          <Text style={styles.transactionPrice}>
+          <Text style={[styles.transactionTitle, { color: colors.text }]}>{item.productTitle}</Text>
+          <Text style={[styles.transactionPrice, { color: colors.primary }]}>
             ₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </Text>
       </View>
@@ -627,55 +660,55 @@ const ProfileScreen = () => {
     switch (activeTab) {
       case 'listings':
         return (
-          <View style={styles.listingsContainer}>
-            <View style={styles.listingsHeader}>
-              <Text style={styles.listingsTitle}>Active Listings</Text>
-              <TouchableOpacity 
-                style={styles.showMoreButton}
-                onPress={() => {
-                  navigation.navigate('Main', {
-                    screen: 'Sell'
-                  });
-                }}
-              >
-                <Text style={styles.showMoreText}>Show All</Text>
-                <Ionicons name="chevron-forward" size={16} color="#4338CA" />
-              </TouchableOpacity>
-            </View>
-            {listings.length === 0 ? (
-              <View style={styles.emptyStateContainer}>
-                <Ionicons name="cube-outline" size={40} color="#94A3B8" />
-                <Text style={styles.emptyStateTitle}>No listings yet</Text>
-                <Text style={styles.emptyStateSubtitle}>Create your first listing to start selling.</Text>
+            <View style={styles.listingsContainer}>
+              <View style={styles.listingsHeader}>
+                <Text style={[styles.listingsTitle, { color: colors.text }]}>Active Listings</Text>
+                <TouchableOpacity 
+                  style={styles.showMoreButton}
+                  onPress={() => {
+                    navigation.navigate('Main', {
+                      screen: 'Sell'
+                    });
+                  }}
+                >
+                  <Text style={[styles.showMoreText, { color: colors.primary }]}>Show All</Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                </TouchableOpacity>
               </View>
-            ) : (
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.listingsCarousel}
-            >
-                {listingPreview.map((item) => {
-                  const imageUrl = item.images?.[0] ?? 'https://placehold.co/400x500?text=CamPulse';
-                  const priceValue = item.price ?? 0;
-                  return (
+              {listings.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="cube-outline" size={40} color={colors.muted} />
+                  <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No listings yet</Text>
+                  <Text style={[styles.emptyStateSubtitle, { color: colors.muted }]}>Create your first listing to start selling.</Text>
+                </View>
+              ) : (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.listingsCarousel}
+              >
+                  {listingPreview.map((item) => {
+                    const imageUrl = item.images?.[0] ?? 'https://placehold.co/400x500?text=CamPulse';
+                    const priceValue = item.price ?? 0;
+                    return (
                 <TouchableOpacity
                   key={item.id}
-                  style={[styles.listingCard, listingPreview.length === 1 ? styles.singleListingCard : null]}
+                  style={[styles.listingCard, { backgroundColor: colors.card, borderColor: colors.border }, listingPreview.length === 1 ? styles.singleListingCard : null]}
                   onPress={() => navigation.navigate('ListingDetails', { listingId: item.id })}
                 >
-                      <Image source={{ uri: imageUrl }} style={styles.listingImage} />
-                  <View style={styles.listingInfo}>
-                    <Text style={styles.listingTitle} numberOfLines={2}>{item.title}</Text>
-                        <Text style={styles.listingPrice}>
+                      <Image source={{ uri: imageUrl }} style={[styles.listingImage, { backgroundColor: colors.surface }]} />
+                  <View style={[styles.listingInfo, { backgroundColor: colors.card }]}>
+                    <Text style={[styles.listingTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
+                        <Text style={[styles.listingPrice, { color: colors.primary }]}>
                           ₦{priceValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </Text>
                   </View>
                 </TouchableOpacity>
                   );
                 })}
-            </ScrollView>
-            )}
-          </View>
+              </ScrollView>
+              )}
+            </View>
         );
       case 'sales':
         return (
@@ -718,8 +751,8 @@ const ProfileScreen = () => {
 
   if (loadingProfile || loadingStats || loadingLists) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4338CA" />
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -754,12 +787,12 @@ const ProfileScreen = () => {
         renderItem={() => (
           <>
             {/* Profile Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
               <View style={styles.avatarContainer}>
-                <Image source={{ uri: displayAvatar }} style={styles.avatar} />
+                <Image source={{ uri: displayAvatar }} style={[styles.avatar, { borderColor: colors.card }]} />
                 {isVerified && (
-                  <View style={styles.verifiedBadge}>
-                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  <View style={[styles.verifiedBadge, { backgroundColor: colors.card }]}>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
                   </View>
                 )}
                 <TouchableOpacity style={styles.avatarEditButton} onPress={async () => {
@@ -802,91 +835,91 @@ const ProfileScreen = () => {
                     Alert.alert('Error', e?.message ?? 'Failed to update avatar');
                   }
                 }}>
-                  <Ionicons name="camera" size={16} color="#4338CA" />
+                  <Ionicons name="camera" size={16} color={colors.primary} />
                 </TouchableOpacity>
               </View>
-              <Text style={styles.name}>{displayName}</Text>
-              <Text style={styles.email}>{displayEmail}</Text>
+              <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
+              <Text style={[styles.email, { color: colors.muted }]}>{displayEmail}</Text>
               <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={16} color="#F59E0B" />
-                <Text style={styles.rating}>{displayRating}</Text>
-                <Text style={styles.reviews}>({displayReviews} reviews)</Text>
+                <Ionicons name="star" size={16} color={colors.warning} />
+                <Text style={[styles.rating, { color: colors.text }]}>{displayRating}</Text>
+                <Text style={[styles.reviews, { color: colors.muted }]}>({displayReviews} reviews)</Text>
               </View>
-              <Text style={styles.joinDate}>Member since {joinedAt}</Text>
-              {displayLocation ? <Text style={styles.location}>{displayLocation}</Text> : null}
-              {displayPhone ? <Text style={styles.phone}>{displayPhone}</Text> : null}
-              {displayBio ? <Text style={styles.bio}>{displayBio}</Text> : null}
+              <Text style={[styles.joinDate, { color: colors.muted }]}>Member since {joinedAt}</Text>
+              {displayLocation ? <Text style={[styles.location, { color: colors.muted }]}>{displayLocation}</Text> : null}
+              {displayPhone ? <Text style={[styles.phone, { color: colors.muted }]}>{displayPhone}</Text> : null}
+              {displayBio ? <Text style={[styles.bio, { color: colors.muted }]}>{displayBio}</Text> : null}
               <View style={styles.verificationContainer}>
                 {isVerified ? (
-                  <View style={styles.verifiedStatus}>
-                    <Ionicons name="shield-checkmark" size={16} color="#10B981" />
-                    <Text style={styles.verifiedText}>Verified Seller</Text>
+                  <View style={[styles.verifiedStatus, { backgroundColor: colors.successMuted }]}>
+                    <Ionicons name="shield-checkmark" size={16} color={colors.success} />
+                    <Text style={[styles.verifiedText, { color: colors.success }]}>Verified Seller</Text>
                   </View>
                 ) : verificationStatus === 'pending' ? (
-                  <View style={styles.pendingStatus}>
-                    <Ionicons name="time-outline" size={16} color="#F59E0B" />
-                    <Text style={styles.pendingText}>Verification in review</Text>
+                  <View style={[styles.pendingStatus, { backgroundColor: colors.warningMuted }]}>
+                    <Ionicons name="time-outline" size={16} color={colors.warning} />
+                    <Text style={[styles.pendingText, { color: colors.warning } ]}>Verification in review</Text>
                   </View>
                 ) : (
                   <TouchableOpacity 
-                    style={styles.verifyButton}
+                    style={[styles.verifyButton, { backgroundColor: colors.primary }]}
                     onPress={handleVerificationRequest}
                   >
                     <Ionicons name="shield-checkmark" size={16} color="#FFFFFF" />
-                    <Text style={styles.verifyButtonText}>Get Verified</Text>
+                    <Text style={[styles.verifyButtonText, { color: '#FFFFFF' }]}>Get Verified</Text>
                   </TouchableOpacity>
                 )}
               </View>
               <TouchableOpacity 
-                style={styles.editProfileButton}
+                style={[styles.editProfileButton, { backgroundColor: colors.surface }]}
                 onPress={handleEditProfile}
               >
-                <Ionicons name="pencil" size={16} color="#4338CA" />
-                <Text style={styles.editProfileText}>Edit Profile</Text>
+                <Ionicons name="pencil" size={16} color={colors.primary} />
+                <Text style={[styles.editProfileText, { color: colors.primary }]}>Edit Profile</Text>
               </TouchableOpacity>
             </View>
 
             {/* Stats Section */}
-            <View style={styles.statsContainer}>
+            <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.listings}</Text>
-                <Text style={styles.statLabel}>Listings</Text>
+                <Text style={[styles.statValue, { color: colors.text }]}>{stats.listings}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>Listings</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.sales}</Text>
-                <Text style={styles.statLabel}>Sales</Text>
+                <Text style={[styles.statValue, { color: colors.text }]}>{stats.sales}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>Sales</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{stats.purchases}</Text>
-                <Text style={styles.statLabel}>Purchases</Text>
+                <Text style={[styles.statValue, { color: colors.text }]}>{stats.purchases}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>Purchases</Text>
               </View>
             </View>
 
             {/* Tabs */}
-            <View style={styles.tabsContainer}>
+            <View style={[styles.tabsContainer, { backgroundColor: colors.card }]}>
               <TouchableOpacity
-                style={[styles.tab, activeTab === 'listings' && styles.activeTab]}
+                style={[styles.tab, activeTab === 'listings' ? { backgroundColor: colors.surface } : null]}
                 onPress={() => setActiveTab('listings')}
               >
-                <Text style={[styles.tabText, activeTab === 'listings' && styles.activeTabText]}>
+                <Text style={[styles.tabText, { color: activeTab === 'listings' ? colors.primary : colors.muted }]}>
                   My Listings
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tab, activeTab === 'sales' && styles.activeTab]}
+                style={[styles.tab, activeTab === 'sales' ? { backgroundColor: colors.surface } : null]}
                 onPress={() => setActiveTab('sales')}
               >
-                <Text style={[styles.tabText, activeTab === 'sales' && styles.activeTabText]}>
+                <Text style={[styles.tabText, { color: activeTab === 'sales' ? colors.primary : colors.muted }]}>
                   Sales
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tab, activeTab === 'purchases' && styles.activeTab]}
+                style={[styles.tab, activeTab === 'purchases' ? { backgroundColor: colors.surface } : null]}
                 onPress={() => setActiveTab('purchases')}
               >
-                <Text style={[styles.tabText, activeTab === 'purchases' && styles.activeTabText]}>
+                <Text style={[styles.tabText, { color: activeTab === 'purchases' ? colors.primary : colors.muted }]}>
                   Purchases
                 </Text>
               </TouchableOpacity>
@@ -897,6 +930,14 @@ const ProfileScreen = () => {
 
             {/* Settings Section */}
             <View style={[styles.settingsContainer, { backgroundColor: colors.card }]}>
+              <TouchableOpacity 
+                style={styles.settingItem}
+                onPress={() => setShowPasswordPrompt(true)}
+              >
+                <Ionicons name="card-outline" size={24} color={colors.text} />
+                <Text style={[styles.settingText, { color: colors.text }]}>{profile?.bank_name && profile?.account_number ? `${profile.bank_name} • ${profile.account_number}` : 'Payment Details'}</Text>
+                <Ionicons name="chevron-forward" size={24} color={colors.muted} />
+              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.settingItem}
                 onPress={() => navigation.navigate('Settings')}
@@ -932,9 +973,9 @@ const ProfileScreen = () => {
             </View>
 
             {/* Logout Button */}
-            <TouchableOpacity style={[styles.logoutButton, { backgroundColor: isDark ? '#7F1D1D' : '#FEE2E2' }]} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={24} color="#DC2626" />
-              <Text style={[styles.logoutText, { color: '#DC2626' }]}>Log Out</Text>
+            <TouchableOpacity style={[styles.logoutButton, { backgroundColor: isDark ? colors.dangerMuted : colors.dangerMuted }]} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={24} color={colors.danger} />
+              <Text style={[styles.logoutText, { color: colors.danger }]}>Log Out</Text>
             </TouchableOpacity>
           </>
         )}
@@ -944,6 +985,194 @@ const ProfileScreen = () => {
 
       {renderEditProfileModal()}
       {renderVerificationModal()}
+      <Modal
+        visible={showPasswordPrompt}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowPasswordPrompt(false)}
+      >
+        <View style={[styles.centerOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.passCard, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="lock-closed-outline" size={20} color={colors.primary} />
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Confirm Password</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowPasswordPrompt(false)} disabled={verifyingPassword}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Account Password</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  style={[styles.input, { flex: 1, borderColor: colors.inputBorder, backgroundColor: colors.inputBackground, color: colors.text }]}
+                  value={passwordInput}
+                  secureTextEntry={!showPassword}
+                  onChangeText={setPasswordInput}
+                  placeholder="Enter your password"
+                  placeholderTextColor={colors.muted}
+                />
+                <TouchableOpacity style={[styles.eyeIconSmall, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.muted} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.secondaryButton, { backgroundColor: colors.surface }]}
+                onPress={() => setShowPasswordPrompt(false)}
+                disabled={verifyingPassword}
+              >
+                <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryButton, { backgroundColor: colors.primary }, verifyingPassword && styles.saveButtonDisabled]}
+                disabled={verifyingPassword}
+                onPress={async () => {
+                  if (!user?.email) { Alert.alert('Authentication', 'Sign in required'); return }
+                  if (!passwordInput.trim()) { Alert.alert('Validation', 'Enter your password'); return }
+                  try {
+                    setVerifyingPassword(true)
+                    const res = await verifyPasswordSignIn(user.email, passwordInput.trim())
+                    setVerifyingPassword(false)
+                    if (res.error) {
+                      Alert.alert('Authentication', res.error.includes('Invalid login credentials') ? 'Invalid password' : res.error)
+                      return
+                    }
+                    setShowPasswordPrompt(false)
+                    setPasswordInput('')
+                    setShowPassword(false)
+                    setShowPaymentModal(true)
+                  } catch (e: any) {
+                    setVerifyingPassword(false)
+                    Alert.alert('Authentication', e?.message || 'Failed to verify password')
+                  }
+                }}
+              >
+                {verifyingPassword ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>Verify</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={showPaymentModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Payment Details</Text>
+              <TouchableOpacity onPress={() => { setShowBankSuggestions(false); setShowPaymentModal(false) }} disabled={savingRecipient}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.editForm}>
+              <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Bank</Text>
+              <TextInput
+                style={[styles.input, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground, color: colors.text }]}
+                value={bankQuery}
+                onChangeText={(v) => {
+                  setBankQuery(v);
+                  setShowBankSuggestions(!!v.trim());
+                  const match = banks.find(b => b.name.toLowerCase() === v.toLowerCase());
+                  if (match) setBankCode(match.code);
+                }}
+                placeholder="Type bank name"
+                placeholderTextColor={colors.muted}
+              />
+              {!!bankQuery.trim() && showBankSuggestions && (
+                <View style={[styles.suggestionBox, { borderColor: colors.border }]}>
+                  <ScrollView style={{ maxHeight: 220 }}>
+                    {banks
+                      .filter(b => b.name.toLowerCase().includes(bankQuery.toLowerCase()))
+                      .map((b) => (
+                        <TouchableOpacity
+                          key={b.code}
+                          style={[styles.suggestionRow, { borderBottomColor: colors.border }]}
+                          onPress={() => {
+                            setBankCode(b.code);
+                            setBankQuery(b.name);
+                            setShowBankSuggestions(false);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.bankName, { color: colors.text }]}>{b.name}</Text>
+                          {bankCode === b.code && (
+                            <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                  </ScrollView>
+                </View>
+              )}
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Account Number</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground, color: colors.text }]}
+                  value={accountNumber}
+                  onChangeText={setAccountNumber}
+                  placeholder="10-digit account number"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Account Name</Text>
+                <TextInput
+                  style={[styles.input, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground, color: colors.text }]}
+                  value={accountName}
+                  onChangeText={setAccountName}
+                  placeholder="Account holder name"
+                  placeholderTextColor={colors.muted}
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.saveButton, { backgroundColor: colors.primary }, savingRecipient && styles.saveButtonDisabled]}
+                onPress={async () => {
+                  if (!bankCode.trim() || !accountNumber.trim() || !accountName.trim()) {
+                    Alert.alert('Validation', 'Please fill all payment details');
+                    return;
+                  }
+                  if (!user?.id) { Alert.alert('Authentication', 'Please sign in'); return }
+                  try {
+                    setSavingRecipient(true)
+                    const res = await registerPaystackRecipient({
+                      userId: user.id,
+                      bankCode,
+                      accountNumber,
+                      accountName,
+                    })
+                    setSavingRecipient(false)
+                    if (res.error) {
+                      Alert.alert('Payment Details', res.error)
+                    } else {
+                      Alert.alert('Payment Details', 'Recipient saved successfully')
+                      try {
+                        const refreshed = await getProfileById(user.id)
+                        if (!refreshed.error) setProfile(refreshed.data)
+                      } catch {}
+                      setShowBankSuggestions(false)
+                      setShowPaymentModal(false)
+                    }
+                  } catch (e: any) {
+                    setSavingRecipient(false)
+                    Alert.alert('Payment Details', e?.message || 'Failed to save recipient')
+                  }
+                }}
+                disabled={savingRecipient}
+              >
+                {savingRecipient ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveButtonText}>Save Payment Details</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1464,6 +1693,80 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#1E293B',
+  },
+  centerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  passCard: {
+    width: '100%',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  suggestionBox: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  eyeIconSmall: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 12,
+  },
+  primaryButton: {
+    backgroundColor: '#4338CA',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  secondaryButton: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#1E293B',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  bankName: {
+    fontSize: 14,
     color: '#1E293B',
   },
   editForm: {

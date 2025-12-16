@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
@@ -53,6 +54,7 @@ const ChatScreen = () => {
   const { colors, isDark } = useThemeMode();
   const bannerAnim = useRef(new Animated.Value(Dimensions.get('window').width)).current;
   const isFocused = useIsFocused();
+  const [showChatOptionsModal, setShowChatOptionsModal] = useState(false);
 
   useEffect(() => {
     const setup = async () => {
@@ -132,34 +134,7 @@ const ChatScreen = () => {
   }, [bannerAnim]);
 
   const handleOptions = () => {
-    Alert.alert(
-      'Chat Options',
-      'What would you like to do?',
-      [
-        {
-          text: 'View Profile',
-          onPress: () => navigation.navigate('Profile', { userId: otherUserId }),
-        },
-        {
-          text: 'Block User',
-          onPress: () => Alert.alert('Block User', 'Are you sure you want to block this user?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Block', style: 'destructive', onPress: () => console.log('User blocked') },
-          ]),
-        },
-        {
-          text: 'Report',
-          onPress: () => Alert.alert('Report User', 'Are you sure you want to report this user?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Report', style: 'destructive', onPress: () => console.log('User reported') },
-          ]),
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+    setShowChatOptionsModal(true);
   };
 
   const handleAttachment = async () => {
@@ -266,17 +241,17 @@ const ChatScreen = () => {
     if (!attachment) return null;
 
     return (
-      <View style={styles.attachmentPreview}>
+      <View style={[styles.attachmentPreview, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
         {attachment.type === 'image' ? (
           <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} />
         ) : (
-          <View style={styles.documentPreview}>
-            <Ionicons name={getFileIcon(attachment.mimeType) as any} size={24} color="#6366F1" />
+          <View style={[styles.documentPreview, { backgroundColor: colors.inputBackground }]}>
+            <Ionicons name={getFileIcon(attachment.mimeType) as any} size={24} color={colors.primary} />
             <Text style={styles.documentName} numberOfLines={1}>
               {attachment.name}
             </Text>
             {attachment.size && (
-              <Text style={styles.documentSize}>
+              <Text style={[styles.documentSize, { color: colors.muted }]}>
                 {formatFileSize(attachment.size)}
               </Text>
             )}
@@ -333,7 +308,7 @@ const ChatScreen = () => {
             <Ionicons
               name={item.read ? "checkmark-done" : "checkmark"}
               size={16}
-              color={item.read ? "#6366F1" : "#94A3B8"}
+              color={item.read ? colors.primary : colors.disabled}
               style={styles.readReceipt}
             />
           )}
@@ -357,8 +332,10 @@ const ChatScreen = () => {
             {otherProfileAvatar ? (
               <Image source={{ uri: otherProfileAvatar }} style={{ width: 24, height: 24, borderRadius: 12 }} />
             ) : null}
-            <Text style={[styles.headerName, { color: colors.text }]}>{otherProfileName}</Text>
-            {otherVerified && <Ionicons name="checkmark-circle" size={16} color="#10B981" />}
+            <TouchableOpacity onPress={() => navigation.navigate('SellerProfile', { userId: otherUserId })}>
+              <Text style={[styles.headerName, { color: colors.text }]}>{otherProfileName}</Text>
+            </TouchableOpacity>
+            {otherVerified && <Ionicons name="checkmark-circle" size={16} color={colors.success} />}
           </View>
           <Text style={[styles.headerStatus, { color: colors.muted }]}>
             {isOtherTyping ? 'typing...' : ''}
@@ -379,6 +356,69 @@ const ChatScreen = () => {
           </View>
         </Animated.View>
       </View>
+
+      <Modal
+        visible={showChatOptionsModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowChatOptionsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setShowChatOptionsModal(false);
+                navigation.navigate('SellerProfile', { userId: otherUserId });
+              }}
+            >
+              <View style={styles.modalOptionLeft}>
+                <Ionicons name="person-circle-outline" size={20} color={colors.text} />
+                <Text style={[styles.modalOptionText, { color: colors.text }]}>View Profile</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setShowChatOptionsModal(false);
+                Alert.alert('Block User', 'Are you sure you want to block this user?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Block', style: 'destructive', onPress: () => {} },
+                ]);
+              }}
+            >
+              <View style={styles.modalOptionLeft}>
+                <Ionicons name="ban-outline" size={20} color="#EF4444" />
+                <Text style={[styles.modalOptionText, { color: colors.text }]}>Block User</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setShowChatOptionsModal(false);
+                Alert.alert('Report User', 'Are you sure you want to report this user?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Report', style: 'destructive', onPress: () => {} },
+                ]);
+              }}
+            >
+              <View style={styles.modalOptionLeft}>
+                <Ionicons name="alert-circle-outline" size={20} color="#F59E0B" />
+                <Text style={[styles.modalOptionText, { color: colors.text }]}>Report</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalCancel]}
+              onPress={() => setShowChatOptionsModal(false)}
+            >
+              <Text style={[styles.modalCancelText, { color: colors.primary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <KeyboardAvoidingView 
         style={styles.keyboardAvoid}
@@ -414,10 +454,10 @@ const ChatScreen = () => {
             style={styles.attachButton}
             onPress={handleAttachment}
           >
-            <Ionicons name="attach" size={24} color="#6366F1" />
+            <Ionicons name="attach" size={24} color={colors.primary} />
           </TouchableOpacity>
           <TextInput
-            style={[styles.input, { backgroundColor: isDark ? '#1F2937' : '#F1F5F9', color: colors.text }]}
+            style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
             placeholder="Type a message..."
             value={message}
             onChangeText={handleTyping}
@@ -427,7 +467,8 @@ const ChatScreen = () => {
           <TouchableOpacity 
             style={[
               styles.sendButton,
-              (!message.trim() && !attachment) && styles.sendButtonDisabled
+              { backgroundColor: colors.primary },
+              (!message.trim() && !attachment) && [{ backgroundColor: colors.disabled }, styles.sendButtonDisabled]
             ]}
             onPress={handleSend}
             disabled={(!message.trim() && !attachment) || isLoading}
@@ -557,6 +598,47 @@ const styles = StyleSheet.create({
   },
   safetyBannerText: {
     fontSize: 11,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  modalOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  modalCancel: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   sendButton: {
     width: 40,
