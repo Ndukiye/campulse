@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -34,10 +35,21 @@ export async function registerForPushNotificationsAsync(userId?: string) {
       console.log('Failed to get push token for push notification!');
       return;
     }
+
+    // Get the project ID from env or config
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ||
+      process.env.EXPO_PUBLIC_PROJECT_ID;
+
+    if (!projectId) {
+      console.log('Project ID not found. Run `eas init` or set EXPO_PUBLIC_PROJECT_ID to enable push notifications.');
+      return;
+    }
+
     // Get the token that uniquely identifies this device
     try {
       token = (await Notifications.getExpoPushTokenAsync({
-        projectId: process.env.EXPO_PUBLIC_PROJECT_ID, // Ensure this is set in your env
+        projectId,
       })).data;
       console.log('Expo Push Token:', token);
     } catch (e) {
