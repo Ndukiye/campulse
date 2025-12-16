@@ -1,4 +1,4 @@
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -14,6 +14,13 @@ Notifications.setNotificationHandler({
 
 export async function registerForPushNotificationsAsync(userId?: string) {
   let token;
+
+  // Check if running in Expo Go
+  const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  if (isExpoGo && Platform.OS === 'android') {
+    console.log('Push notifications are not supported in Expo Go on Android. Please use a development build.');
+    return;
+  }
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
