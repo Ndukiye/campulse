@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { signIn as authSignIn, signOut as authSignOut, signUp as authSignUp, getCurrentUser } from '../services/authService';
+import { signIn as authSignIn, signOut as authSignOut, signUp as authSignUp, getCurrentUser, signInWithGoogle as authSignInWithGoogle } from '../services/authService';
 import { getProfileById, upsertProfile } from '../services/profileService';
 
 type User = {
@@ -16,6 +16,7 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   signIn: async () => ({ error: null }),
   signOut: async () => {},
   signUp: async () => ({ error: null }),
+  signInWithGoogle: async () => ({ error: null }),
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -189,6 +191,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signInWithGoogle = async () => {
+    return await authSignInWithGoogle();
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -198,6 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signOut,
         signUp,
+        signInWithGoogle,
       }}
     >
       {children}

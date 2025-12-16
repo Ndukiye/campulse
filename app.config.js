@@ -3,7 +3,11 @@ export default {
     name: 'CamPulse',
     slug: 'campulse',
     version: '1.0.0',
+    scheme: 'campulse',
     orientation: 'portrait',
+    plugins: [
+      'expo-web-browser'
+    ],
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     splash: {

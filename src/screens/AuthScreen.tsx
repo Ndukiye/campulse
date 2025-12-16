@@ -11,13 +11,15 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useThemeMode } from '../context/ThemeContext';
+import { resetPassword } from '../services/authService';
 
 const AuthScreen = () => {
-  const { loading, signIn, signUp } = useAuth();
+  const { loading, signIn, signUp, signInWithGoogle } = useAuth();
   const { colors } = useThemeMode();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
@@ -28,6 +30,42 @@ const AuthScreen = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setIsSubmitting(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        if (error !== 'Google sign in cancelled') {
+          Alert.alert('Google Sign In Error', error);
+        }
+      }
+    } catch (e) {
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetEmail) {
+      Alert.alert('Validation', 'Please enter your email address');
+      return;
+    }
+    setIsResetting(true);
+    const { error } = await resetPassword(resetEmail);
+    setIsResetting(false);
+    if (error) {
+      Alert.alert('Error', error);
+    } else {
+      Alert.alert('Success', 'Password reset instructions sent to your email');
+      setShowResetModal(false);
+      setResetEmail('');
+    }
+  };
 
   const handleSubmit = async () => {
     console.log('[AuthScreen] Submit clicked', { isLogin, formData });
@@ -182,6 +220,20 @@ const AuthScreen = () => {
               </View>
             </View>
 
+            {isLogin && (
+              <TouchableOpacity 
+                style={styles.forgotPasswordContainer}
+                onPress={() => {
+                  setResetEmail(formData.email);
+                  setShowResetModal(true);
+                }}
+              >
+                <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                  Forgot Password?
+                </Text>
+              </TouchableOpacity>
+            )}
+
             {!isLogin && (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Confirm Password</Text>
@@ -216,7 +268,11 @@ const AuthScreen = () => {
             </View>
 
             <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialButton}>
+              <TouchableOpacity 
+                style={styles.socialButton}
+                onPress={handleGoogleSignIn}
+                disabled={isSubmitting}
+              >
                 <Ionicons name="logo-google" size={24} color="#1E293B" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.socialButton}>
