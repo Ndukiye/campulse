@@ -14,6 +14,14 @@ export async function getProfileById(id: string) {
   };
 }
 
+export async function updatePushToken(userId: string, token: string | null) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ expo_push_token: token })
+    .eq('id', userId);
+  return { error: error ? error.message : null };
+}
+
 export async function upsertProfile(row: ProfilesInsert | ProfilesUpdate) {
   const { data, error } = await supabase
     .from('profiles')

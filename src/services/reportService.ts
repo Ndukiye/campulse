@@ -11,7 +11,12 @@ export interface Report {
   created_at: string;
   reporter?: { email: string; name: string };
   reported?: { email: string; name: string };
-  listing?: { title: string };
+  listing?: { 
+    id: string;
+    title: string;
+    seller_id: string;
+    seller?: { name: string; email: string };
+  };
 }
 
 export async function createReport(report: Omit<Report, 'id' | 'created_at' | 'status'>) {
@@ -31,7 +36,12 @@ export async function getReports() {
       *,
       reporter:reporter_id(email, name),
       reported:reported_id(email, name),
-      listing:listing_id(title)
+      listing:listing_id(
+        id,
+        title,
+        seller_id,
+        seller:seller_id(name, email)
+      )
     `)
     .order('created_at', { ascending: false });
 

@@ -18,6 +18,7 @@ export interface ProfilesRow {
   paystack_recipient_code?: string | null;
   bank_name?: string | null;
   account_number?: string | null;
+  expo_push_token?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

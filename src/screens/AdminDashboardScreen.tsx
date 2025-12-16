@@ -804,9 +804,20 @@ const AdminDashboardScreen = () => {
                   </Text>
                 )}
                 {item.listing && (
-                  <Text style={[styles.itemSub, { color: colors.muted }]}>
-                    Listing: {item.listing.title}
-                  </Text>
+                  <View>
+                    <TouchableOpacity onPress={() => navigation.navigate('ListingDetails', { listingId: item.listing!.id })}>
+                      <Text style={[styles.itemSub, { color: colors.primary, textDecorationLine: 'underline' }]}>
+                        Listing: {item.listing.title}
+                      </Text>
+                    </TouchableOpacity>
+                    {item.listing.seller && (
+                      <TouchableOpacity onPress={() => navigation.navigate('SellerProfile', { userId: item.listing!.seller_id })}>
+                        <Text style={[styles.itemSub, { color: colors.primary, textDecorationLine: 'underline' }]}>
+                          Seller: {item.listing.seller.name || item.listing.seller.email}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 )}
               </View>
               <View>

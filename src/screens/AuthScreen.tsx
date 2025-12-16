@@ -32,11 +32,17 @@ const AuthScreen = () => {
   const handleSubmit = async () => {
     console.log('[AuthScreen] Submit clicked', { isLogin, formData });
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (isLogin) {
       // Login logic
       if (!formData.email || !formData.password) {
         console.warn('[AuthScreen] Missing email or password');
         Alert.alert('Validation', 'Please fill in all fields');
+        return;
+      }
+      if (!emailRegex.test(formData.email)) {
+        Alert.alert('Validation', 'Please enter a valid email address');
         return;
       }
       try {
@@ -66,6 +72,10 @@ const AuthScreen = () => {
       if (!formData.email || !formData.password || !formData.confirmPassword || !formData.name) {
         console.warn('[AuthScreen] Missing signup fields');
         Alert.alert('Validation', 'Please fill in all fields');
+        return;
+      }
+      if (!emailRegex.test(formData.email)) {
+        Alert.alert('Validation', 'Please enter a valid email address');
         return;
       }
       if (formData.password !== formData.confirmPassword) {
@@ -230,11 +240,118 @@ const AuthScreen = () => {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={showResetModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowResetModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Reset Password</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.muted }]}>
+              Enter your email address and we'll send you instructions to reset your password.
+            </Text>
+            
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+              value={resetEmail}
+              onChangeText={setResetEmail}
+              placeholder="Enter your email"
+              placeholderTextColor={colors.muted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowResetModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.resetButton, { backgroundColor: colors.primary }]}
+                onPress={handleResetPassword}
+                disabled={isResetting}
+              >
+                {isResetting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.resetButtonText}>Send Link</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 20,
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: 'transparent',
+  },
+  cancelButtonText: {
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  resetButton: {
+    // backgroundColor set inline
+  },
+  resetButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginBottom: 24,
+    marginTop: -16,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',

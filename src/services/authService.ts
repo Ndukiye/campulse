@@ -35,3 +35,8 @@ export async function getCurrentUser() {
   if (error) return null;
   return data.user ?? null;
 }
+
+export async function resetPassword(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  return { error: error ? error.message : null };
+}

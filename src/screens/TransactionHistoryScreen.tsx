@@ -178,6 +178,24 @@ export default function TransactionHistoryScreen() {
               <Text style={styles.confirmButtonText}>Confirm Delivered</Text>
             </TouchableOpacity>
           )}
+          {item.status !== 'refunded' && item.status !== 'cancelled' && item.buyerId && (
+              <TouchableOpacity
+                style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  padding: 8,
+                  marginTop: 8,
+                  borderWidth: 1,
+                  borderColor: colors.danger,
+                  borderRadius: 8
+                }}
+                onPress={() => navigation.navigate('Report', { type: 'user', targetId: item.buyerId! })}
+              >
+                <Ionicons name="flag-outline" size={16} color={colors.danger} style={{ marginRight: 6 }} />
+                <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600' }}>Report Buyer</Text>
+              </TouchableOpacity>
+           )}
         </View>
       </View>
     );
