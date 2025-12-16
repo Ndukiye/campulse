@@ -24,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { useThemeMode } from '../context/ThemeContext';
 import { isFavorite as checkFavorite, addFavorite, removeFavorite } from '../services/favoritesService';
 import { useToast } from '../context/ToastContext';
+import { listProductReviews } from '../services/reviewService';
 
 const { width } = Dimensions.get('window');
 
@@ -107,6 +108,7 @@ const ListingDetailsScreen = () => {
   }, [currentProduct]);
 
   const [relatedProducts, setRelatedProducts] = useState<ProductSummary[]>([]);
+  const [productReviews, setProductReviews] = useState<Array<{ id: string, user: string, rating: number, created_at: string, comment: string }>>([]);
   useEffect(() => {
     const fetchRelated = async () => {
       if (!currentProduct?.category) {
@@ -121,6 +123,20 @@ const ListingDetailsScreen = () => {
   }, [currentProduct?.category, currentProduct?.id]);
 
   useEffect(() => {
+    const fetchReviews = async () => {
+      if (!currentProduct?.id) {
+        setProductReviews([]);
+        return;
+      }
+      const r = await listProductReviews(currentProduct.id, 20);
+      if (!r.error) {
+        setProductReviews(r.data ?? []);
+      }
+    };
+    fetchReviews();
+  }, [currentProduct?.id]);
+
+  useEffect(() => {
     const maxQty = Math.max(0, Number(currentProduct?.available_quantity ?? 1))
     if (maxQty === 0) {
       setQuantity(1)
@@ -130,22 +146,13 @@ const ListingDetailsScreen = () => {
       setQuantity(1)
     }
   }, [currentProduct?.id, currentProduct?.available_quantity])
-  const comments = [
-    {
-      id: '1',
-      user: 'Sarah M.',
-      rating: 5,
-      date: '2 days ago',
-      comment: 'Great condition, exactly as described!',
-    },
-    {
-      id: '2',
-      user: 'Mike R.',
-      rating: 4,
-      date: '1 week ago',
-      comment: 'Good seller, fast response.',
-    },
-  ];
+  const comments = productReviews.map(r => ({
+    id: r.id,
+    user: r.user,
+    rating: r.rating,
+    date: new Date(r.created_at).toLocaleDateString(),
+    comment: r.comment,
+  }));
 
   const renderImageItem = ({ item }: { item: { id: string; url: string }}) => (
     <Image source={{ uri: item.url }} style={styles.productImage} />

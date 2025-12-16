@@ -308,7 +308,7 @@ const ChatScreen = () => {
             <Ionicons
               name={item.read ? "checkmark-done" : "checkmark"}
               size={16}
-              color={item.read ? colors.primary : colors.disabled}
+              color={item.read ? "#FFFFFF" : colors.disabled}
               style={styles.readReceipt}
             />
           )}

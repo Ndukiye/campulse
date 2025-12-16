@@ -54,10 +54,12 @@ export default async function handler(req: Request): Promise<Response> {
       paystack_recipient_code: recipientCode,
       bank_name: undefined as any,
       account_number: undefined as any,
+      account_name: undefined as any,
     }
     // Optionally include fields (some databases may not have columns yet)
     ;(patchPayload as any).bank_name = createJson?.data?.details?.bank_name ?? null
     ;(patchPayload as any).account_number = accountNumber
+    ;(patchPayload as any).account_name = accountName
     const updateRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`, {
       method: 'PATCH',
       headers: {

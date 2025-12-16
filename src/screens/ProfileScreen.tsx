@@ -36,6 +36,7 @@ import {
 import { useToast } from '../context/ToastContext';
 import { registerPaystackRecipient, listPaystackBanks } from '../services/paystackService';
 import { signIn as verifyPasswordSignIn } from '../services/authService';
+import { submitSellerReview } from '../services/reviewService';
 
 type EditableProfile = {
   name: string;
@@ -102,6 +103,12 @@ const ProfileScreen = () => {
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
   const [savingRecipient, setSavingRecipient] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewSellerRating, setReviewSellerRating] = useState(0);
+  const [reviewProductRating, setReviewProductRating] = useState(0);
+  const [reviewProductComment, setReviewProductComment] = useState('');
+  const [reviewContext, setReviewContext] = useState<{ sellerId: string | null, productId: string | null } | null>(null);
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -644,6 +651,11 @@ const ProfileScreen = () => {
                   const res = await getPurchasesByBuyer(user!.id, 20)
                   setPurchases(res.data ?? [])
                 } catch {}
+                setReviewContext({ sellerId: item.sellerId ?? null, productId: item.productId ?? null })
+                setReviewSellerRating(0)
+                setReviewProductRating(0)
+                setReviewProductComment('')
+                setShowReviewModal(true)
               }
             }}
           >
@@ -748,6 +760,99 @@ const ProfileScreen = () => {
         );
     }
   };
+
+  const renderReviewModal = () => (
+    <Modal
+      visible={showReviewModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowReviewModal(false)}
+    >
+      <View style={[styles.centerOverlay, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.passCard, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Rate Seller & Product</Text>
+            <TouchableOpacity onPress={() => setShowReviewModal(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <View style={{ padding: 16 }}>
+            <Text style={[styles.label, { color: colors.text }]}>Seller Rating</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              {[1,2,3,4,5].map((n) => (
+                <TouchableOpacity key={n} onPress={() => setReviewSellerRating(n)}>
+                  <Ionicons name={reviewSellerRating >= n ? 'star' : 'star-outline'} size={22} color={colors.primary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={[styles.label, { color: colors.text }]}>Product Rating</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              {[1,2,3,4,5].map((n) => (
+                <TouchableOpacity key={n} onPress={() => setReviewProductRating(n)}>
+                  <Ionicons name={reviewProductRating >= n ? 'star' : 'star-outline'} size={22} color={colors.primary} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={[styles.label, { color: colors.text }]}>Product Comment</Text>
+            <TextInput
+              style={[styles.input, styles.bioInput, { borderColor: colors.inputBorder, backgroundColor: colors.inputBackground, color: colors.text }]}
+              placeholder="Share your experience with the product"
+              placeholderTextColor={colors.muted}
+              value={reviewProductComment}
+              onChangeText={setReviewProductComment}
+              multiline
+            />
+            <View style={[styles.actionRow]}>
+              <TouchableOpacity style={[styles.secondaryButton, { backgroundColor: colors.surface }]} onPress={() => setShowReviewModal(false)}>
+                <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+                onPress={async () => {
+                  if (!user?.id || !reviewContext?.sellerId || !reviewContext?.productId) { Alert.alert('Review', 'Unable to submit review'); return }
+                  if (reviewSellerRating < 1 || reviewProductRating < 1) { Alert.alert('Review', 'Please rate seller and product'); return }
+                  try {
+                    setSubmittingReview(true)
+                    const res = await submitSellerReview({
+                      reviewerId: user.id,
+                      reviewedUserId: reviewContext.sellerId,
+                      productId: reviewContext.productId,
+                      rating: reviewSellerRating,
+                      comment: undefined,
+                    })
+                    if (res.error) {
+                      setSubmittingReview(false)
+                      Alert.alert('Review', res.error)
+                      return
+                    }
+                    const res2 = await submitProductReview({
+                      reviewerId: user.id,
+                      productId: reviewContext.productId,
+                      rating: reviewProductRating,
+                      comment: reviewProductComment.trim() || undefined,
+                    })
+                    setSubmittingReview(false)
+                    if (res2.error) {
+                      Alert.alert('Review', res2.error)
+                      return
+                    }
+                    toast.show('Review', 'Thanks for your review', 'success')
+                    setShowReviewModal(false)
+                  } catch (e: any) {
+                    setSubmittingReview(false)
+                    Alert.alert('Review', e?.message || 'Failed to submit review')
+                  }
+                }}
+                disabled={submittingReview}
+              >
+                {submittingReview ? <ActivityIndicator color="#FFFFFF" /> : <Text style={[styles.saveButtonText]}>Submit Review</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
 
   if (loadingProfile || loadingStats || loadingLists) {
     return (
